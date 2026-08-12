@@ -92,16 +92,21 @@
   }
 
   .link-icon {
-    width: 46px;
-    height: 46px;
+    width: 52px;
+    height: 52px;
     flex-shrink: 0;
     border-radius: 50%;
     background: var(--forest);
-    color: #fff;
+    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 19px;
+  }
+
+  .link-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .link-body { flex: 1; min-width: 0; }
@@ -143,8 +148,8 @@
   </header>
 
   <div class="links">
-    <a class="link-card" href="esv-reading-plan.html">
-      <div class="link-icon">&#128214;</div>
+    <a class="link-card" href="esv-reading-plan-2.html">
+      <div class="link-icon"><img src="bible.png" alt=""></div>
       <div class="link-body">
         <div class="link-title">Daily Bible Reading</div>
         <div class="link-desc">Five chapters a day, Genesis through Revelation, with notes and memorization</div>
@@ -153,7 +158,7 @@
     </a>
 
     <a class="link-card" href="bujo.html">
-      <div class="link-icon">&#9998;</div>
+      <div class="link-icon"><img src="journal.png" alt=""></div>
       <div class="link-body">
         <div class="link-title">Bullet Journal</div>
         <div class="link-desc">Rapid logging, monthly log, collections, and search</div>
@@ -161,8 +166,8 @@
       <div class="link-arrow">&#8594;</div>
     </a>
 
-    <a class="link-card" href="sermon-prep.html">
-      <div class="link-icon">&#9997;</div>
+    <a class="link-card" href="sermon-prep-4.html">
+      <div class="link-icon"><img src="writing.png" alt=""></div>
       <div class="link-body">
         <div class="link-title">Sermon Preparation</div>
         <div class="link-desc">Passage lookup, notes, archive, and outline synthesis</div>
