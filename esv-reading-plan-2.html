@@ -561,10 +561,7 @@
     return passages.map(p => {
       const escaped = escapeHtml(p.text)
         .replace(/\[(\d+)\]/g, '<span class="verse-num">$1</span>');
-      return `<div class="book-chapter-block">
-        <span class="block-title">${escapeHtml(p.label)}</span>
-        ${escaped}
-      </div>`;
+      return `<div class="book-chapter-block">${escaped}</div>`;
     }).join('');
   }
 
