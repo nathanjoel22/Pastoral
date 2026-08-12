@@ -605,3 +605,245 @@
     main.innerHTML = `
       <div class="panel-title">Migrate Open Tasks</div>
       ${stale.length === 0
+        ? `<div class="card"><div class="empty-state">You're all caught up — nothing to migrate.</div></div>`
+        : `<div class="card">
+            ${renderEntryList(stale, { showDate: true })}
+            <div class="field-row" style="margin-top:16px;">
+              <button class="btn" onclick="migrateAll()">Migrate all ${stale.length} to today</button>
+            </div>
+          </div>`
+      }
+    `;
+  }
+
+  function viewCollections() {
+    const names = Object.keys(data.collections);
+    if (!activeCollection && names.length) activeCollection = names[0];
+    main.innerHTML = `
+      <div class="panel-title">Collections</div>
+      <div class="card">
+        <div class="field-row">
+          <input type="text" id="newCollectionName" placeholder="New collection name...">
+          <button class="btn" onclick="createCollection()">Create</button>
+        </div>
+      </div>
+      ${names.length ? `
+        <div class="collection-tabs">
+          ${names.map(n => `<button class="collection-tab ${n===activeCollection?'active':''}" onclick="selectCollection('${escapeHtml(n).replace(/'/g,"\\'")}')">${escapeHtml(n)}</button>`).join('')}
+        </div>
+        ${activeCollection ? `
+          <div class="card">
+            <div class="field-row">
+              <div class="type-toggle">
+                <button data-t="task" class="${currentCaptureType==='task'?'selected':''}" onclick="setCaptureType('task')">• Task</button>
+                <button data-t="event" class="${currentCaptureType==='event'?'selected':''}" onclick="setCaptureType('event')">○ Event</button>
+                <button data-t="note" class="${currentCaptureType==='note'?'selected':''}" onclick="setCaptureType('note')">– Note</button>
+              </div>
+            </div>
+            <div class="field-row">
+              <input type="text" id="collectionItemText" placeholder="Add to ${escapeHtml(activeCollection)}...">
+              <button class="btn" onclick="submitCollectionItem()">Add</button>
+            </div>
+            ${renderEntryList(data.entries.filter(e => e.collection === activeCollection))}
+          </div>
+        ` : ''}
+      ` : `<div class="empty-state">No collections yet — create one above.</div>`}
+    `;
+    if (activeCollection) {
+      const input = document.getElementById('collectionItemText');
+      if (input) input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitCollectionItem(); });
+    }
+  }
+
+  function viewIndex() {
+    const nowMonth = curMonthKey();
+    const dates = [...new Set(data.entries.filter(e => e.scope !== 'month' && !e.collection).map(e => e.date))].sort().reverse();
+    const collectionNames = Object.keys(data.collections);
+    const monthlyItems = monthEntriesFor(nowMonth);
+    main.innerHTML = `
+      <div class="panel-title">Index</div>
+      <div class="card">
+        <div class="index-block">
+          <h3>Monthly Log — ${monthLabel(nowMonth)}</h3>
+          <div class="field-row">
+            <div class="type-toggle">
+              <button data-t="task" class="${currentCaptureType==='task'?'selected':''}" onclick="setCaptureType('task')">• Task</button>
+              <button data-t="event" class="${currentCaptureType==='event'?'selected':''}" onclick="setCaptureType('event')">○ Event</button>
+              <button data-t="note" class="${currentCaptureType==='note'?'selected':''}" onclick="setCaptureType('note')">– Note</button>
+            </div>
+          </div>
+          <div class="field-row">
+            <input type="text" id="monthlyLogText" placeholder="Goal, deadline, or reminder for ${monthLabel(nowMonth)}...">
+            <button class="btn" onclick="submitMonthlyItem()">Add</button>
+          </div>
+          ${renderEntryList(monthlyItems, { emptyText: "Nothing on the month's log yet." })}
+          <p style="font-size:12px;color:var(--ink-soft);font-style:italic;margin-top:10px;">
+            When ${monthLabel(nowMonth)} ends, any open items here migrate into next month automatically, and this month's entries move into Collections.
+          </p>
+        </div>
+        <div class="index-block">
+          <h3>Daily Logs</h3>
+          ${dates.length ? dates.map(d => {
+            const count = entriesForDate(d).length;
+            return `<div class="index-row" onclick="jumpToDate('${d}')"><span>${prettyDate(d)}</span><span>${count} entr${count===1?'y':'ies'}</span></div>`;
+          }).join('') : '<div class="empty-state">Nothing logged yet.</div>'}
+        </div>
+        ${collectionNames.length ? `
+          <div class="index-block">
+            <h3>Collections</h3>
+            ${collectionNames.map(n => {
+              const count = data.entries.filter(e => e.collection === n).length;
+              return `<div class="index-row" onclick="jumpToCollection('${escapeHtml(n).replace(/'/g,"\\'")}')"><span>${escapeHtml(n)}</span><span>${count} item${count===1?'':'s'}</span></div>`;
+            }).join('')}
+          </div>
+        ` : ''}
+      </div>
+    `;
+    const monthlyInput = document.getElementById('monthlyLogText');
+    if (monthlyInput) monthlyInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitMonthlyItem(); });
+  }
+
+  function viewSearch() {
+    main.innerHTML = `
+      <div class="panel-title">Search</div>
+      <div class="card">
+        <div class="field-row">
+          <input type="text" id="searchQuery" placeholder="Search all entries...">
+          <button class="btn" onclick="runSearch()">Search</button>
+        </div>
+      </div>
+      <div id="searchResults"></div>
+    `;
+    const input = document.getElementById('searchQuery');
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
+    input.focus();
+  }
+
+  function runSearch() {
+    const q = document.getElementById('searchQuery').value.trim().toLowerCase();
+    const results = document.getElementById('searchResults');
+    if (!q) { results.innerHTML = ''; return; }
+    const matches = data.entries.filter(e => e.text.toLowerCase().includes(q));
+    results.innerHTML = `
+      <div class="panel-title">${matches.length} match${matches.length===1?'':'es'}</div>
+      <div class="card">${renderEntryList(matches, { showDate: true })}</div>
+    `;
+  }
+
+  // ---------- Actions ----------
+  function toggleDone(id) {
+    const e = data.entries.find(x => x.id === id);
+    if (!e) return;
+    e.status = e.status === 'done' ? 'open' : 'done';
+    saveData();
+    renderCurrentView();
+  }
+
+  function deleteEntry(id) {
+    data.entries = data.entries.filter(x => x.id !== id);
+    saveData();
+    renderCurrentView();
+  }
+
+  function setCaptureType(t) {
+    currentCaptureType = t;
+    renderCurrentView();
+  }
+
+  function submitCapture() {
+    const input = document.getElementById('captureText');
+    const text = input.value.trim();
+    if (!text) return;
+    addEntry(currentCaptureType, text);
+    input.value = '';
+    renderCurrentView();
+  }
+
+  function submitCollectionItem() {
+    const input = document.getElementById('collectionItemText');
+    const text = input.value.trim();
+    if (!text || !activeCollection) return;
+    addEntry(currentCaptureType, text, { collection: activeCollection, date: todayStr() });
+    input.value = '';
+    renderCurrentView();
+  }
+
+  function submitMonthlyItem() {
+    const input = document.getElementById('monthlyLogText');
+    const text = input.value.trim();
+    if (!text) return;
+    addEntry(currentCaptureType, text, { scope: 'month', month: curMonthKey() });
+    input.value = '';
+    renderCurrentView();
+  }
+
+  function createCollection() {
+    const input = document.getElementById('newCollectionName');
+    const name = input.value.trim();
+    if (!name) return;
+    data.collections[name] = true;
+    activeCollection = name;
+    saveData();
+    renderCurrentView();
+  }
+
+  function selectCollection(name) {
+    activeCollection = name;
+    renderCurrentView();
+  }
+
+  function migrateAll() {
+    const dateStr = todayStr();
+    const stale = openTasksBefore(dateStr);
+    stale.forEach(e => {
+      e.status = 'migrated';
+      addEntry('task', e.text, { date: dateStr });
+    });
+    saveData();
+    renderCurrentView();
+  }
+
+  function jumpToDate(dateStr) {
+    switchView('browse');
+    setTimeout(() => {
+      const el = document.getElementById('browseDate');
+      if (el) { el.value = dateStr; renderBrowseResults(); }
+    }, 0);
+  }
+
+  function jumpToCollection(name) {
+    activeCollection = name;
+    switchView('collections');
+  }
+
+  // ---------- View router ----------
+  let currentView = 'today';
+  const views = {
+    today: viewToday,
+    capture: viewCapture,
+    browse: viewBrowse,
+    migrate: viewMigrate,
+    collections: viewCollections,
+    index: viewIndex,
+    search: viewSearch,
+  };
+
+  function renderCurrentView() {
+    views[currentView]();
+  }
+
+  function switchView(view) {
+    currentView = view;
+    setActiveNav(view);
+    renderCurrentView();
+  }
+
+  navButtons.forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
+
+  processMonthRollover();
+  document.getElementById('headerDate').textContent = prettyDate(todayStr());
+  renderCurrentView();
+</script>
+
+</body>
+</html>
