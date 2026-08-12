@@ -489,6 +489,40 @@
     .passage-col { width: 100%; }
     .passage-card { position: static; max-height: none; }
   }
+
+  /* ---------- Print / PDF export ---------- */
+  .print-only { display: none; }
+
+  @media print {
+    body * { visibility: hidden; }
+    .print-only, .print-only * { visibility: visible; }
+    .print-only {
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background: #fff;
+      color: #1a1a1a;
+      font-family: Georgia, 'Times New Roman', serif;
+      padding: 0.5in;
+    }
+    .print-only h1 {
+      font-size: 20px;
+      margin: 0 0 20px 0;
+      color: #1a1a1a;
+    }
+    .print-only .po-block {
+      margin: 14px 0 4px 0;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .print-only .po-sub {
+      margin: 4px 0 4px 20px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+  }
 </style>
 </head>
 <body>
@@ -503,7 +537,7 @@
   <div class="tabs">
     <button class="tab-btn active" data-tab="prepare">Prepare</button>
     <button class="tab-btn" data-tab="archive">Archived Notes</button>
-    <button class="tab-btn" data-tab="outline">Outline Suggestions</button>
+    <button class="tab-btn" data-tab="outline">Outline Creation</button>
   </div>
 
   <!-- ===== PREPARE TAB ===== -->
@@ -558,10 +592,12 @@
   <!-- ===== OUTLINE TAB ===== -->
   <div class="tab-panel" id="tab-outline">
     <div class="card outline-card" id="outlineCard">
-      <div class="passage-placeholder">Search a passage on the Prepare tab first, then come back here for a suggested outline.</div>
+      <div class="passage-placeholder">No outline yet.</div>
     </div>
   </div>
 </div>
+
+<div id="printableOutline" class="print-only"></div>
 
 <script>
   // ============ ESV API ============
@@ -945,22 +981,39 @@
       renderSynthesizedOutline(outlineSourceState);
       return;
     }
-    card.innerHTML = `<div class="passage-placeholder">No outline yet. Go to Archived Notes, select the notes you want to draw from, and click "Create Outline."</div>`;
+    card.innerHTML = `
+      <div class="passage-placeholder">No outline yet.</div>
+      <div class="outline-actions" style="margin-top:14px;">
+        <button class="btn" id="startNewOutlineBtn">Start New Outline</button>
+      </div>
+      <div class="outline-note" style="margin-top:10px;">
+        Or go to Archived Notes, select the notes you want to draw from, and click "Create Outline" to start from existing material.
+      </div>
+    `;
+    document.getElementById('startNewOutlineBtn').addEventListener('click', startNewOutline);
+  }
+
+  function startNewOutline() {
+    outlineSourceState = { sourceNotes: [], combinedRefs: '', generatedAt: new Date().toISOString() };
+    try { localStorage.setItem(OUTLINE_DRAFT_KEY, JSON.stringify(outlineSourceState)); } catch (e) { console.error(e); }
+    renderOutline();
   }
 
   function renderSynthesizedOutline(src) {
     const card = document.getElementById('outlineCard');
-    const sourceHtml = src.sourceNotes.map(n => `
+    const hasSourceNotes = src.sourceNotes && src.sourceNotes.length > 0;
+    const sourceHtml = hasSourceNotes ? src.sourceNotes.map(n => `
       <div class="outline-source-item">
         <strong>${escapeHtml(n.reference)}</strong> &mdash; ${prettyDateTime(n.dateSaved)}
         <div>${escapeHtml(n.text).slice(0, 600)}${n.text.length > 600 ? '…' : ''}</div>
       </div>
-    `).join('');
+    `).join('') : '';
 
     const hasKey = !!getStoredClaudeKey();
 
     card.innerHTML = `
-      <div class="outline-ref">Synthesized Outline &mdash; ${escapeHtml(src.combinedRefs)}</div>
+      <div class="outline-ref">${hasSourceNotes ? 'Synthesized Outline' : 'New Outline'}</div>
+      ${hasSourceNotes ? `
       <div class="outline-note">
         Click "Generate with Claude" to have your notes synthesized automatically, or fill the fields in yourself.
       </div>
@@ -975,10 +1028,11 @@
           <button class="btn subtle" id="saveClaudeKeyBtn">Save Key</button>
         </div>
       </div>
+      ` : ''}
 
       <div class="outline-block">
         <strong>I. Introduction</strong>
-        <div class="outline-sub">A. Passage: <strong>${escapeHtml(src.combinedRefs)}</strong></div>
+        <div class="outline-sub">A. Passage: <span class="outline-editable" contenteditable="true" data-placeholder="e.g. John 3:1-21" id="passageField">${escapeHtml(src.combinedRefs || '')}</span></div>
         <div class="outline-sub">B. Prayer</div>
         <div class="outline-sub">C. Example</div>
         <div class="outline-sub">D. Thesis: <span class="outline-editable" contenteditable="true" data-placeholder="Write a suggested thesis here..." id="thesisField"></span></div>
@@ -1004,35 +1058,44 @@
       </div>
 
       <div class="outline-actions">
-        <button class="btn" id="generateAiBtn">Generate with Claude</button>
-        <button class="btn subtle" id="copyPromptBtn">Copy Prompt Instead</button>
+        ${hasSourceNotes ? '<button class="btn" id="generateAiBtn">Generate with Claude</button>' : ''}
+        ${hasSourceNotes ? '<button class="btn subtle" id="copyPromptBtn">Copy Prompt Instead</button>' : ''}
         <button class="btn subtle" id="insertSynthBtn">Insert into Notes</button>
+        <button class="btn subtle" id="exportPdfBtn">Export to PDF</button>
         <button class="btn subtle" id="startOverOutlineBtn">Start Over</button>
-        ${hasKey ? '<button class="btn subtle" id="changeKeyBtn">Change Key</button>' : ''}
+        ${hasSourceNotes && hasKey ? '<button class="btn subtle" id="changeKeyBtn">Change Key</button>' : ''}
       </div>
       <div class="add-status" id="aiGenStatus"></div>
 
+      ${hasSourceNotes ? `
       <div class="outline-source">
         <strong>Source notes used:</strong>
         ${sourceHtml}
       </div>
+      ` : ''}
     `;
 
-    document.getElementById('saveClaudeKeyBtn').addEventListener('click', () => {
-      const val = document.getElementById('claudeKeyInput').value.trim();
-      if (!val) return;
-      setStoredClaudeKey(val);
-      document.getElementById('claudeKeyRow').style.display = 'none';
-    });
+    const saveKeyBtn = document.getElementById('saveClaudeKeyBtn');
+    if (saveKeyBtn) {
+      saveKeyBtn.addEventListener('click', () => {
+        const val = document.getElementById('claudeKeyInput').value.trim();
+        if (!val) return;
+        setStoredClaudeKey(val);
+        document.getElementById('claudeKeyRow').style.display = 'none';
+      });
+    }
     const changeKeyBtn = document.getElementById('changeKeyBtn');
     if (changeKeyBtn) {
       changeKeyBtn.addEventListener('click', () => {
         document.getElementById('claudeKeyRow').style.display = 'block';
       });
     }
-    document.getElementById('generateAiBtn').addEventListener('click', () => generateOutlineWithClaude(src));
-    document.getElementById('copyPromptBtn').addEventListener('click', () => copyOutlinePrompt(src));
+    const generateBtn = document.getElementById('generateAiBtn');
+    if (generateBtn) generateBtn.addEventListener('click', () => generateOutlineWithClaude(src));
+    const copyPromptBtn = document.getElementById('copyPromptBtn');
+    if (copyPromptBtn) copyPromptBtn.addEventListener('click', () => copyOutlinePrompt(src));
     document.getElementById('insertSynthBtn').addEventListener('click', insertSynthesizedOutline);
+    document.getElementById('exportPdfBtn').addEventListener('click', exportOutlinePdf);
     document.getElementById('startOverOutlineBtn').addEventListener('click', () => {
       outlineSourceState = null;
       try { localStorage.removeItem(OUTLINE_DRAFT_KEY); } catch (e) {}
@@ -1139,7 +1202,7 @@ Here are my notes to synthesize:
     const pointIII = document.getElementById('pointIII').innerHTML;
     const pointIV = document.getElementById('pointIV').innerHTML;
     const reflection = document.getElementById('reflectionField').innerHTML;
-    const refs = outlineSourceState.combinedRefs;
+    const refs = document.getElementById('passageField').textContent.trim();
 
     const html = `
       <div style="font-weight:700; color:var(--green);">Sermon Outline</div>
@@ -1159,6 +1222,32 @@ Here are my notes to synthesize:
     editor.innerHTML = html + editor.innerHTML;
     saveDraft();
     document.querySelector('.tab-btn[data-tab="prepare"]').click();
+  }
+
+  function exportOutlinePdf() {
+    const thesis = document.getElementById('thesisField').innerHTML;
+    const pointII = document.getElementById('pointII').innerHTML;
+    const pointIII = document.getElementById('pointIII').innerHTML;
+    const pointIV = document.getElementById('pointIV').innerHTML;
+    const reflection = document.getElementById('reflectionField').innerHTML;
+    const refs = document.getElementById('passageField').textContent.trim();
+
+    const printable = document.getElementById('printableOutline');
+    printable.innerHTML = `
+      <h1>Sermon Outline</h1>
+      <div class="po-block"><strong>I. Introduction</strong></div>
+      <div class="po-sub">A. Passage: ${escapeHtml(refs) || '<em>(not set)</em>'}</div>
+      <div class="po-sub">B. Prayer</div>
+      <div class="po-sub">C. Example</div>
+      <div class="po-sub">D. Thesis: ${thesis || '<em>(not set)</em>'}</div>
+      <div class="po-block"><strong>II.</strong> ${pointII || '<em>(not set)</em>'}</div>
+      <div class="po-block"><strong>III.</strong> ${pointIII || '<em>(not set)</em>'}</div>
+      <div class="po-block"><strong>IV.</strong> ${pointIV || '<em>(not set)</em>'}</div>
+      <div class="po-block"><strong>V. Conclusion</strong></div>
+      <div class="po-sub">A. Closing reflection question: ${reflection || '<em>(not set)</em>'}</div>
+      <div class="po-sub">B. Benediction</div>
+    `;
+    window.print();
   }
 
   // ============ Restore draft on load ============
