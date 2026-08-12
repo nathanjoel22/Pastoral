@@ -549,6 +549,7 @@
       <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end;">
         <button class="btn subtle" id="mergeBtn" disabled>Merge Selected</button>
         <button class="btn subtle" id="createOutlineBtn" disabled>Create Outline</button>
+        <button class="btn subtle" id="exportBackupBtn">Export Backup</button>
       </div>
     </div>
     <div id="archiveContainer"></div>
@@ -777,6 +778,22 @@
     if (mod && e.key.toLowerCase() === 'i') { e.preventDefault(); document.execCommand('italic'); }
   });
 
+  // Warn before a paste would wipe out most or all of an existing note.
+  editor.addEventListener('paste', (e) => {
+    try {
+      const existingText = (editor.textContent || '').trim();
+      const sel = window.getSelection();
+      const selectedText = (sel && !sel.isCollapsed) ? sel.toString() : '';
+      const wipesMost = existingText.length > 15 && selectedText.length >= existingText.length * 0.85;
+      if (wipesMost) {
+        const ok = confirm("This paste will replace most or all of your current note. Continue?");
+        if (!ok) { e.preventDefault(); }
+      }
+    } catch (err) {
+      // If anything goes wrong detecting this, don't block the paste.
+    }
+  });
+
   // ============ Save to Archive ============
   document.getElementById('saveBtn').addEventListener('click', () => {
     const statusEl = document.getElementById('saveStatus');
@@ -901,6 +918,24 @@
     try { localStorage.setItem(OUTLINE_DRAFT_KEY, JSON.stringify(outlineSourceState)); } catch (e) { console.error(e); }
 
     document.querySelector('.tab-btn[data-tab="outline"]').click();
+  });
+
+  document.getElementById('exportBackupBtn').addEventListener('click', () => {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      notes: archiveData.notes,
+    };
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `sermon-prep-backup-${dateStamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   });
 
   // ============ Outline tab ============
