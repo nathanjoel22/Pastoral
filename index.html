@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nathan Pugh's Workspace</title>
+<style>
+  :root {
+    --bg: #F6F3EC;
+    --bg-line: #E5DFCE;
+    --ink: #23261F;
+    --ink-soft: #6b6a5f;
+    --forest: #2F4A3C;
+    --forest-soft: #4A6B57;
+    --gold: #B08D3E;
+    --card: #FFFFFF;
+    --shadow: rgba(35, 38, 31, 0.08);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: Georgia, 'Times New Roman', serif;
+    color: var(--ink);
+    background-color: var(--bg);
+    background-image: linear-gradient(var(--bg-line) 1px, transparent 1px);
+    background-size: 100% 34px;
+    background-position: 0 90px;
+  }
+
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 64px 24px 80px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 56px;
+  }
+
+  header .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+
+  header h1 {
+    margin: 0;
+    font-size: 34px;
+    font-weight: 700;
+    color: var(--forest);
+    letter-spacing: 0.01em;
+  }
+
+  header .sub {
+    margin-top: 10px;
+    font-size: 14px;
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+
+  .links {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .link-card {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    background: var(--card);
+    border: 1px solid var(--bg-line);
+    border-radius: 8px;
+    padding: 22px 24px;
+    text-decoration: none;
+    color: inherit;
+    box-shadow: 0 4px 16px var(--shadow);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  }
+
+  .link-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(35,38,31,0.14);
+    border-color: var(--gold);
+  }
+
+  .link-icon {
+    width: 46px;
+    height: 46px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--forest);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 19px;
+  }
+
+  .link-body { flex: 1; min-width: 0; }
+
+  .link-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--forest);
+    margin-bottom: 3px;
+  }
+
+  .link-desc {
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+
+  .link-arrow {
+    font-size: 16px;
+    color: var(--gold);
+    flex-shrink: 0;
+  }
+
+  footer {
+    text-align: center;
+    margin-top: 56px;
+    font-size: 11px;
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Personal Tools</div>
+    <h1>Nathan Pugh's Workspace</h1>
+    <div class="sub">A home for daily reading, notes, and sermon prep</div>
+  </header>
+
+  <div class="links">
+    <a class="link-card" href="esv-reading-plan.html">
+      <div class="link-icon">&#128214;</div>
+      <div class="link-body">
+        <div class="link-title">Daily Bible Reading</div>
+        <div class="link-desc">Five chapters a day, Genesis through Revelation, with notes and memorization</div>
+      </div>
+      <div class="link-arrow">&#8594;</div>
+    </a>
+
+    <a class="link-card" href="bujo.html">
+      <div class="link-icon">&#9998;</div>
+      <div class="link-body">
+        <div class="link-title">Bullet Journal</div>
+        <div class="link-desc">Rapid logging, monthly log, collections, and search</div>
+      </div>
+      <div class="link-arrow">&#8594;</div>
+    </a>
+
+    <a class="link-card" href="sermon-prep.html">
+      <div class="link-icon">&#9997;</div>
+      <div class="link-body">
+        <div class="link-title">Sermon Preparation</div>
+        <div class="link-desc">Passage lookup, notes, archive, and outline synthesis</div>
+      </div>
+      <div class="link-arrow">&#8594;</div>
+    </a>
+  </div>
+
+  <footer>Private workspace &middot; built for personal use</footer>
+</div>
+
+</body>
+</html>
