@@ -997,13 +997,15 @@
       ` : ''}
 
       <div class="outline-actions">
-        ${hasSourceNotes ? '<button class="btn" id="generateAiBtn">Generate with Claude</button>' : ''}
+        <button class="btn" id="saveOutlineBtn">Save</button>
+        ${hasSourceNotes ? '<button class="btn subtle" id="generateAiBtn">Generate with Claude</button>' : ''}
         ${hasSourceNotes ? '<button class="btn subtle" id="copyPromptBtn">Copy Prompt Instead</button>' : ''}
         <button class="btn subtle" id="insertSynthBtn">Insert into Notes</button>
         <button class="btn subtle" id="exportPdfBtn">Export to PDF</button>
         <button class="btn subtle" id="clearOutlineBtn">Clear Outline</button>
         ${hasSourceNotes && hasKey ? '<button class="btn subtle" id="changeKeyBtn">Change Key</button>' : ''}
       </div>
+      <div class="save-status" id="outlineSaveStatus"></div>
       <div class="add-status" id="aiGenStatus"></div>
 
       ${hasSourceNotes ? `
@@ -1020,6 +1022,22 @@
     outlineEditor.addEventListener('input', () => {
       applyRomanHeadingFormatting(outlineEditor);
       saveOutlineText(outlineEditor.innerHTML);
+    });
+
+    // Tab indents within the line instead of moving focus out of the editor.
+    outlineEditor.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        document.execCommand('insertText', false, '\u00A0\u00A0\u00A0\u00A0');
+      }
+    });
+
+    document.getElementById('saveOutlineBtn').addEventListener('click', () => {
+      saveOutlineText(outlineEditor.innerHTML);
+      const statusEl = document.getElementById('outlineSaveStatus');
+      statusEl.textContent = 'Saved — you can come back to this anytime.';
+      statusEl.className = 'save-status ok';
+      setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 2500);
     });
 
     const saveKeyBtn = document.getElementById('saveClaudeKeyBtn');
