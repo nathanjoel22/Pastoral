@@ -424,43 +424,25 @@
     padding: 20px 22px;
   }
 
-  .outline-ref {
+  .outline-editor {
+    min-height: 420px;
+    font-family: Georgia, 'Times New Roman', serif;
     font-size: 15px;
+    line-height: 1.7;
+    color: var(--ink);
+    padding: 6px 4px;
+    outline: none;
+  }
+  .outline-editor:empty::before {
+    content: attr(data-placeholder);
+    color: #8f97a0;
+    font-style: italic;
+  }
+  .outline-editor .roman-heading {
     font-weight: 700;
     color: var(--green);
-    margin-bottom: 14px;
   }
 
-  .outline-list {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 18px 0;
-    counter-reset: roman-counter;
-  }
-  .outline-list li {
-    counter-increment: roman-counter;
-    padding: 8px 0 8px 34px;
-    position: relative;
-    font-size: 14px;
-    border-bottom: 1px dashed rgba(169,120,47,0.25);
-  }
-  .outline-list li::before {
-    content: counter(roman-counter, upper-roman) ".";
-    position: absolute;
-    left: 0;
-    font-weight: 700;
-    color: var(--brass);
-  }
-
-  .outline-block { margin-bottom: 18px; }
-  .outline-block > strong { display: block; font-size: 15px; color: var(--green); margin-bottom: 6px; }
-  .outline-sub { margin: 4px 0 4px 20px; font-size: 14px; }
-  .outline-editable {
-    outline: none;
-    border-bottom: 1px dashed rgba(169,120,47,0.5);
-    padding: 2px 4px;
-  }
-  .outline-editable:empty::before { content: attr(data-placeholder); color: #8f97a0; font-style: italic; }
   .outline-note {
     font-size: 11px;
     color: var(--ink-soft);
@@ -974,51 +956,35 @@
     URL.revokeObjectURL(url);
   });
 
-  // ============ Outline tab ============
+  // ============ Outline tab (freeform) ============
+  const OUTLINE_TEXT_KEY = 'sermon_prep_outline_text_v1';
+  const ROMAN_HEADING_RE = /^(X{0,3})(IX|IV|V?I{0,3})\.(\s|$)/i;
+
+  function loadOutlineText() {
+    try { return localStorage.getItem(OUTLINE_TEXT_KEY) || ''; } catch (e) { return ''; }
+  }
+  function saveOutlineText(html) {
+    try { localStorage.setItem(OUTLINE_TEXT_KEY, html); } catch (e) { console.error(e); }
+  }
+
   function renderOutline() {
     const card = document.getElementById('outlineCard');
-    if (outlineSourceState) {
-      renderSynthesizedOutline(outlineSourceState);
-      return;
-    }
-    card.innerHTML = `
-      <div class="passage-placeholder">No outline yet.</div>
-      <div class="outline-actions" style="margin-top:14px;">
-        <button class="btn" id="startNewOutlineBtn">Start New Outline</button>
-      </div>
-      <div class="outline-note" style="margin-top:10px;">
-        Or go to Archived Notes, select the notes you want to draw from, and click "Create Outline" to start from existing material.
-      </div>
-    `;
-    document.getElementById('startNewOutlineBtn').addEventListener('click', startNewOutline);
-  }
+    const hasSourceNotes = !!(outlineSourceState && outlineSourceState.sourceNotes && outlineSourceState.sourceNotes.length > 0);
+    const savedHtml = loadOutlineText();
+    const hasKey = !!getStoredClaudeKey();
 
-  function startNewOutline() {
-    outlineSourceState = { sourceNotes: [], combinedRefs: '', generatedAt: new Date().toISOString() };
-    try { localStorage.setItem(OUTLINE_DRAFT_KEY, JSON.stringify(outlineSourceState)); } catch (e) { console.error(e); }
-    renderOutline();
-  }
-
-  function renderSynthesizedOutline(src) {
-    const card = document.getElementById('outlineCard');
-    const hasSourceNotes = src.sourceNotes && src.sourceNotes.length > 0;
-    const sourceHtml = hasSourceNotes ? src.sourceNotes.map(n => `
+    const sourceHtml = hasSourceNotes ? outlineSourceState.sourceNotes.map(n => `
       <div class="outline-source-item">
         <strong>${escapeHtml(n.reference)}</strong> &mdash; ${prettyDateTime(n.dateSaved)}
         <div>${escapeHtml(n.text).slice(0, 600)}${n.text.length > 600 ? '…' : ''}</div>
       </div>
     `).join('') : '';
 
-    const hasKey = !!getStoredClaudeKey();
-
     card.innerHTML = `
-      <div class="outline-ref">${hasSourceNotes ? 'Synthesized Outline' : 'New Outline'}</div>
-      ${hasSourceNotes ? `
-      <div class="outline-note">
-        Click "Generate with Claude" to have your notes synthesized automatically, or fill the fields in yourself.
-      </div>
+      <div id="outlineEditor" class="outline-editor" contenteditable="true" data-placeholder="Start writing your outline. Begin a line with a Roman numeral (I., II., III...) to mark a new point.">${savedHtml}</div>
 
-      <div id="claudeKeyRow" style="${hasKey ? 'display:none;' : ''} margin-bottom:16px; padding:12px 14px; background:rgba(0,0,0,0.03); border-radius:4px;">
+      ${hasSourceNotes ? `
+      <div id="claudeKeyRow" style="${hasKey ? 'display:none;' : ''} margin:16px 0; padding:12px 14px; background:rgba(0,0,0,0.03); border-radius:4px;">
         <div class="outline-note" style="margin-bottom:8px;">
           Paste your Anthropic API key to enable AI generation. It's stored only in this browser, never in the page itself.
           <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" style="color:var(--brass);">Get a key &#8599;</a>
@@ -1030,39 +996,12 @@
       </div>
       ` : ''}
 
-      <div class="outline-block">
-        <strong>I. Introduction</strong>
-        <div class="outline-sub">A. Passage: <span class="outline-editable" contenteditable="true" data-placeholder="e.g. John 3:1-21" id="passageField">${escapeHtml(src.combinedRefs || '')}</span></div>
-        <div class="outline-sub">B. Prayer</div>
-        <div class="outline-sub">C. Example</div>
-        <div class="outline-sub">D. Thesis: <span class="outline-editable" contenteditable="true" data-placeholder="Write a suggested thesis here..." id="thesisField"></span></div>
-      </div>
-
-      <div class="outline-block">
-        <strong>II.</strong>
-        <div class="outline-editable" contenteditable="true" data-placeholder="First point that supports the thesis..." id="pointII" style="min-height:40px;"></div>
-      </div>
-      <div class="outline-block">
-        <strong>III.</strong>
-        <div class="outline-editable" contenteditable="true" data-placeholder="Second point that supports the thesis..." id="pointIII" style="min-height:40px;"></div>
-      </div>
-      <div class="outline-block">
-        <strong>IV.</strong>
-        <div class="outline-editable" contenteditable="true" data-placeholder="Third point that supports the thesis..." id="pointIV" style="min-height:40px;"></div>
-      </div>
-
-      <div class="outline-block">
-        <strong>V. Conclusion</strong>
-        <div class="outline-sub">A. Closing reflection question: <span class="outline-editable" contenteditable="true" data-placeholder="What question invites reflection?" id="reflectionField"></span></div>
-        <div class="outline-sub">B. Benediction</div>
-      </div>
-
       <div class="outline-actions">
         ${hasSourceNotes ? '<button class="btn" id="generateAiBtn">Generate with Claude</button>' : ''}
         ${hasSourceNotes ? '<button class="btn subtle" id="copyPromptBtn">Copy Prompt Instead</button>' : ''}
         <button class="btn subtle" id="insertSynthBtn">Insert into Notes</button>
         <button class="btn subtle" id="exportPdfBtn">Export to PDF</button>
-        <button class="btn subtle" id="startOverOutlineBtn">Start Over</button>
+        <button class="btn subtle" id="clearOutlineBtn">Clear Outline</button>
         ${hasSourceNotes && hasKey ? '<button class="btn subtle" id="changeKeyBtn">Change Key</button>' : ''}
       </div>
       <div class="add-status" id="aiGenStatus"></div>
@@ -1074,6 +1013,14 @@
       </div>
       ` : ''}
     `;
+
+    const outlineEditor = document.getElementById('outlineEditor');
+    try { document.execCommand('defaultParagraphSeparator', false, 'div'); } catch (e) {}
+
+    outlineEditor.addEventListener('input', () => {
+      applyRomanHeadingFormatting(outlineEditor);
+      saveOutlineText(outlineEditor.innerHTML);
+    });
 
     const saveKeyBtn = document.getElementById('saveClaudeKeyBtn');
     if (saveKeyBtn) {
@@ -1091,16 +1038,51 @@
       });
     }
     const generateBtn = document.getElementById('generateAiBtn');
-    if (generateBtn) generateBtn.addEventListener('click', () => generateOutlineWithClaude(src));
+    if (generateBtn) generateBtn.addEventListener('click', () => generateOutlineWithClaude(outlineSourceState));
     const copyPromptBtn = document.getElementById('copyPromptBtn');
-    if (copyPromptBtn) copyPromptBtn.addEventListener('click', () => copyOutlinePrompt(src));
-    document.getElementById('insertSynthBtn').addEventListener('click', insertSynthesizedOutline);
+    if (copyPromptBtn) copyPromptBtn.addEventListener('click', () => copyOutlinePrompt(outlineSourceState));
+    document.getElementById('insertSynthBtn').addEventListener('click', insertOutlineIntoNotes);
     document.getElementById('exportPdfBtn').addEventListener('click', exportOutlinePdf);
-    document.getElementById('startOverOutlineBtn').addEventListener('click', () => {
+    document.getElementById('clearOutlineBtn').addEventListener('click', () => {
+      const ok = confirm('Clear this outline? This can\'t be undone.');
+      if (!ok) return;
       outlineSourceState = null;
       try { localStorage.removeItem(OUTLINE_DRAFT_KEY); } catch (e) {}
+      saveOutlineText('');
       renderOutline();
     });
+  }
+
+  // Bolds and colors any line that starts with a Roman numeral heading
+  // (e.g. "I.", "II.", "III."); everything else stays plain black text.
+  function applyRomanHeadingFormatting(editor) {
+    const sel = window.getSelection();
+    let caretBlock = null, caretOffset = 0;
+    if (sel && sel.rangeCount) {
+      const range = sel.getRangeAt(0);
+      caretBlock = range.startContainer;
+      caretOffset = range.startOffset;
+    }
+
+    Array.from(editor.children).forEach(block => {
+      const text = block.textContent || '';
+      if (ROMAN_HEADING_RE.test(text.trim())) {
+        block.classList.add('roman-heading');
+      } else {
+        block.classList.remove('roman-heading');
+      }
+    });
+
+    // Restore caret position since className changes can disturb it in some browsers.
+    try {
+      if (caretBlock && sel) {
+        const range = document.createRange();
+        range.setStart(caretBlock, Math.min(caretOffset, caretBlock.textContent ? caretBlock.textContent.length : 0));
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    } catch (e) { /* non-critical */ }
   }
 
   async function generateOutlineWithClaude(src) {
@@ -1112,15 +1094,14 @@
       document.getElementById('claudeKeyRow').style.display = 'block';
       return;
     }
+    if (!src || !src.sourceNotes || src.sourceNotes.length === 0) return;
 
     statusEl.textContent = 'Generating with Claude...';
     statusEl.className = 'add-status';
 
-    const systemPrompt = 'You are helping a pastor synthesize study notes into a sermon outline. Respond ONLY with valid JSON in exactly this shape, no markdown formatting, no code fences, no commentary before or after: {"thesis": "...", "pointII": "...", "pointIII": "...", "pointIV": "...", "reflectionQuestion": "..."} Each value should be plain text, a sentence or two.';
+    const systemPrompt = 'You are helping a pastor synthesize study notes into a sermon outline. Respond with plain text only, following this exact structure, with no markdown formatting, no code fences, no commentary before or after:\n\nI. Introduction\n   A. Passage: [reference]\n   B. Prayer\n   C. Example\n   D. Thesis: [a clear thesis statement]\n\nThen II, III, and IV as points that support and prove the thesis (one or two sentences each, prefixed with the roman numeral and a period, e.g. "II. ...").\n\nV. Conclusion\n   A. Closing reflection question\n   B. Benediction\n\nDo not write content for Prayer, Example, or Benediction — leave those lines as headers only.';
 
     const userPrompt = `Passage: ${src.combinedRefs}
-
-Synthesize these study notes into a sermon outline. Write a clear thesis statement, then three points (pointII, pointIII, pointIV) that support and prove that thesis, drawing on the content of the notes below. Also suggest one closing reflection question. Do not write content for Prayer, Example, or Benediction.
 
 Notes:
 ` + src.sourceNotes.map(n => `--- ${n.reference} (${prettyDateTime(n.dateSaved)}) ---\n${n.text}`).join('\n\n');
@@ -1148,15 +1129,17 @@ Notes:
       }
 
       const json = await res.json();
-      const rawText = (json.content || []).map(b => b.text || '').join('');
-      const cleaned = rawText.trim().replace(/^```json\s*/i, '').replace(/```$/, '').trim();
-      const parsed = JSON.parse(cleaned);
+      const rawText = (json.content || []).map(b => b.text || '').join('').trim();
 
-      document.getElementById('thesisField').textContent = parsed.thesis || '';
-      document.getElementById('pointII').textContent = parsed.pointII || '';
-      document.getElementById('pointIII').textContent = parsed.pointIII || '';
-      document.getElementById('pointIV').textContent = parsed.pointIV || '';
-      document.getElementById('reflectionField').textContent = parsed.reflectionQuestion || '';
+      const outlineEditor = document.getElementById('outlineEditor');
+      const linesHtml = rawText.split('\n').map(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return '<div><br></div>';
+        return `<div>${escapeHtml(trimmed)}</div>`;
+      }).join('');
+      outlineEditor.innerHTML = linesHtml;
+      applyRomanHeadingFormatting(outlineEditor);
+      saveOutlineText(outlineEditor.innerHTML);
 
       statusEl.textContent = 'Generated — feel free to edit anything above.';
       statusEl.className = 'add-status ok';
@@ -1168,6 +1151,7 @@ Notes:
   }
 
   function copyOutlinePrompt(src) {
+    if (!src || !src.sourceNotes || src.sourceNotes.length === 0) return;
     const promptText = `Please synthesize the following sermon notes into an outline using this exact structure. Do not create content for Prayer, Example, or Benediction — leave those as headers only.
 
 I. Introduction
@@ -1196,57 +1180,18 @@ Here are my notes to synthesize:
     });
   }
 
-  function insertSynthesizedOutline() {
-    const thesis = document.getElementById('thesisField').innerHTML;
-    const pointII = document.getElementById('pointII').innerHTML;
-    const pointIII = document.getElementById('pointIII').innerHTML;
-    const pointIV = document.getElementById('pointIV').innerHTML;
-    const reflection = document.getElementById('reflectionField').innerHTML;
-    const refs = document.getElementById('passageField').textContent.trim();
-
-    const html = `
-      <div style="font-weight:700; color:var(--green);">Sermon Outline</div>
-      <div><strong>I. Introduction</strong></div>
-      <div style="margin-left:20px;">A. Passage: ${escapeHtml(refs)}</div>
-      <div style="margin-left:20px;">B. Prayer</div>
-      <div style="margin-left:20px;">C. Example</div>
-      <div style="margin-left:20px;">D. Thesis: ${thesis}</div>
-      <div><strong>II.</strong> ${pointII}</div>
-      <div><strong>III.</strong> ${pointIII}</div>
-      <div><strong>IV.</strong> ${pointIV}</div>
-      <div><strong>V. Conclusion</strong></div>
-      <div style="margin-left:20px;">A. Closing reflection question: ${reflection}</div>
-      <div style="margin-left:20px;">B. Benediction</div>
-      <hr style="margin:14px 0; border:none; border-top:1px dashed rgba(169,120,47,0.35);">
-    `;
+  function insertOutlineIntoNotes() {
+    const outlineEditor = document.getElementById('outlineEditor');
+    const html = `<div style="font-weight:700; color:var(--green);">Sermon Outline</div>${outlineEditor.innerHTML}<hr style="margin:14px 0; border:none; border-top:1px dashed rgba(169,120,47,0.35);">`;
     editor.innerHTML = html + editor.innerHTML;
     saveDraft();
     document.querySelector('.tab-btn[data-tab="prepare"]').click();
   }
 
   function exportOutlinePdf() {
-    const thesis = document.getElementById('thesisField').innerHTML;
-    const pointII = document.getElementById('pointII').innerHTML;
-    const pointIII = document.getElementById('pointIII').innerHTML;
-    const pointIV = document.getElementById('pointIV').innerHTML;
-    const reflection = document.getElementById('reflectionField').innerHTML;
-    const refs = document.getElementById('passageField').textContent.trim();
-
+    const outlineEditor = document.getElementById('outlineEditor');
     const printable = document.getElementById('printableOutline');
-    printable.innerHTML = `
-      <h1>Sermon Outline</h1>
-      <div class="po-block"><strong>I. Introduction</strong></div>
-      <div class="po-sub">A. Passage: ${escapeHtml(refs) || '<em>(not set)</em>'}</div>
-      <div class="po-sub">B. Prayer</div>
-      <div class="po-sub">C. Example</div>
-      <div class="po-sub">D. Thesis: ${thesis || '<em>(not set)</em>'}</div>
-      <div class="po-block"><strong>II.</strong> ${pointII || '<em>(not set)</em>'}</div>
-      <div class="po-block"><strong>III.</strong> ${pointIII || '<em>(not set)</em>'}</div>
-      <div class="po-block"><strong>IV.</strong> ${pointIV || '<em>(not set)</em>'}</div>
-      <div class="po-block"><strong>V. Conclusion</strong></div>
-      <div class="po-sub">A. Closing reflection question: ${reflection || '<em>(not set)</em>'}</div>
-      <div class="po-sub">B. Benediction</div>
-    `;
+    printable.innerHTML = `<h1>Sermon Outline</h1>${outlineEditor.innerHTML}`;
     window.print();
   }
 
