@@ -11,7 +11,9 @@
     --ink: #23261F;
     --ink-soft: #6b6a5f;
     --forest: #2F4A3C;
+    --forest-soft: #4A6B57;
     --gold: #B08D3E;
+    --gold-bright: #C9A24B;
     --card: #FFFFFF;
     --shadow: rgba(35, 38, 31, 0.08);
   }
@@ -24,20 +26,17 @@
     font-family: Georgia, 'Times New Roman', serif;
     color: var(--ink);
     background-color: var(--bg);
-    background-image: linear-gradient(var(--bg-line) 1px, transparent 1px);
-    background-size: 100% 34px;
-    background-position: 0 90px;
   }
 
   .wrap {
-    max-width: 660px;
+    max-width: 1100px;
     margin: 0 auto;
-    padding: 48px 24px 80px;
+    padding: 40px 24px 80px;
   }
 
   header {
     text-align: center;
-    margin-bottom: 40px;
+    margin-bottom: 32px;
     position: relative;
   }
 
@@ -75,15 +74,173 @@
     color: var(--forest);
   }
 
-  .card {
+  .lords-prayer-card {
     background: var(--card);
     border: 1px solid var(--bg-line);
     border-radius: 8px;
-    padding: 30px;
+    padding: 30px 36px;
     box-shadow: 0 4px 16px var(--shadow);
     text-align: center;
+    max-width: 640px;
+    margin: 0 auto 40px;
+  }
+
+  .lords-prayer-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--forest);
+    margin-bottom: 2px;
+  }
+
+  .lords-prayer-ref {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 700;
+    margin-bottom: 18px;
+  }
+
+  .lords-prayer-text {
+    font-size: 15px;
+    line-height: 1.8;
+    color: var(--ink);
+    font-style: italic;
+    white-space: pre-wrap;
+  }
+
+  .lords-prayer-loading,
+  .lords-prayer-error {
+    font-size: 13px;
     color: var(--ink-soft);
     font-style: italic;
+  }
+  .lords-prayer-error { color: var(--forest); }
+
+  .columns {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  .column-card {
+    background: var(--card);
+    border: 1px solid var(--bg-line);
+    border-radius: 8px;
+    padding: 20px 20px 22px;
+    box-shadow: 0 4px 16px var(--shadow);
+    min-height: 300px;
+  }
+
+  .column-title {
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 700;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--bg-line);
+  }
+
+  input[type=text] {
+    width: 100%;
+    font-family: Georgia, serif;
+    font-size: 14px;
+    padding: 10px 12px;
+    border: 1px solid var(--bg-line);
+    border-radius: 4px;
+    background: #fff;
+    color: var(--ink);
+  }
+  input[type=text]:focus {
+    outline: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 2px rgba(176,141,62,0.15);
+  }
+  input[type=text]::placeholder { color: #a39a86; font-style: italic; }
+
+  .prayer-list {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .prayer-item {
+    position: relative;
+    padding: 10px 22px 10px 4px;
+    cursor: pointer;
+    border-bottom: 1px dashed var(--bg-line);
+  }
+  .prayer-item:last-child { border-bottom: none; }
+  .prayer-item:hover { background: rgba(176,141,62,0.06); }
+
+  .prayer-line {
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ink);
+  }
+  .prayer-line::before {
+    content: '\2022';
+    margin-right: 7px;
+    color: var(--gold);
+  }
+  .prayer-item.answered .prayer-line {
+    color: var(--forest);
+    font-weight: 600;
+  }
+  .prayer-item.answered .prayer-line::before {
+    color: var(--forest);
+  }
+
+  .prayer-date {
+    font-size: 10px;
+    color: var(--ink-soft);
+    font-style: italic;
+    margin-top: 3px;
+    margin-left: 15px;
+  }
+  .prayer-item.answered .prayer-date { color: var(--forest-soft); }
+
+  .prayer-answer-text {
+    font-size: 12px;
+    color: var(--forest);
+    font-style: italic;
+    margin-top: 4px;
+    margin-left: 15px;
+    line-height: 1.4;
+  }
+
+  .prayer-remove {
+    all: unset;
+    position: absolute;
+    top: 8px;
+    right: 0;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+  .prayer-remove:hover { color: #9c3b34; }
+
+  .answer-input-row {
+    margin-top: 8px;
+    margin-left: 15px;
+  }
+  .answer-input-row input[type=text] {
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+
+  .empty-col {
+    font-size: 12px;
+    color: var(--ink-soft);
+    font-style: italic;
+    padding: 14px 4px;
+  }
+
+  @media (max-width: 780px) {
+    .columns { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -96,8 +253,223 @@
     <h1>Prayer</h1>
   </header>
 
-  <div class="card">This page is ready to be built out — let me know what you'd like here.</div>
+  <div class="lords-prayer-card">
+    <div class="lords-prayer-title">The Lord's Prayer</div>
+    <div class="lords-prayer-ref">Matthew 6:9&ndash;13</div>
+    <div id="lordsPrayerBody">
+      <div class="lords-prayer-loading">Loading...</div>
+    </div>
+  </div>
+
+  <div class="columns">
+    <div class="column-card">
+      <div class="column-title">New Prayers</div>
+      <input type="text" id="newPrayerInput" placeholder="Type a prayer and hit Enter...">
+      <div class="prayer-list" id="newPrayerList"></div>
+    </div>
+
+    <div class="column-card">
+      <div class="column-title">Ongoing Prayers</div>
+      <div class="prayer-list" id="ongoingPrayerList"></div>
+    </div>
+
+    <div class="column-card">
+      <div class="column-title">Answered Prayers</div>
+      <div class="prayer-list" id="answeredPrayerList"></div>
+    </div>
+  </div>
 </div>
+
+<script>
+  // ============ ESV API ============
+  const ESV_API_KEY = '46eb88fdca716c9ea434ff3d72f1e5198681154d';
+  const ESV_API_URL = 'https://api.esv.org/v3/passage/text/';
+
+  async function fetchLordsPrayer() {
+    const params = new URLSearchParams({
+      q: 'Matthew 6:9-13',
+      'include-verse-numbers': 'false',
+      'include-headings': 'false',
+      'include-footnotes': 'false',
+      'include-short-copyright': 'false',
+      'include-passage-references': 'false',
+    });
+    const res = await fetch(`${ESV_API_URL}?${params.toString()}`, {
+      headers: { 'Authorization': `Token ${ESV_API_KEY}` }
+    });
+    if (!res.ok) throw new Error(`ESV API returned ${res.status}`);
+    const json = await res.json();
+    return (json.passages || []).join('\n\n').trim();
+  }
+
+  async function loadLordsPrayer() {
+    const body = document.getElementById('lordsPrayerBody');
+    try {
+      const text = await fetchLordsPrayer();
+      body.innerHTML = `<div class="lords-prayer-text">${escapeHtml(text)}</div>`;
+    } catch (err) {
+      console.error(err);
+      body.innerHTML = `
+        <div class="lords-prayer-error">Couldn't load the passage (${escapeHtml(err.message)}).</div>
+        <button onclick="loadLordsPrayer()" style="all:unset; cursor:pointer; color:var(--gold); font-size:12px; text-decoration:underline; margin-top:6px; display:inline-block;">Try again</button>
+      `;
+    }
+  }
+
+  // ============ Storage ============
+  const STORAGE_KEY = 'prayer_page_data_v1';
+
+  function loadData() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) { console.error(e); }
+    return { prayers: [] };
+  }
+  function saveData() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+    catch (e) { console.error(e); }
+  }
+
+  let data = loadData();
+  let editingAnswerId = null;
+
+  function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str || '';
+    return d.innerHTML;
+  }
+
+  function todayStr() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+
+  function prettyDate(dateStr) {
+    const [y,m,d] = dateStr.split('-').map(Number);
+    const dt = new Date(y, m-1, d);
+    return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  // ============ Prayer actions ============
+  function addPrayer(text) {
+    data.prayers.unshift({
+      id: 'p' + Date.now(),
+      text,
+      status: 'new',
+      dateAdded: todayStr(),
+      dateAnswered: null,
+      answerText: null,
+    });
+    saveData();
+    renderAll();
+  }
+
+  function movePrayer(id, newStatus) {
+    const prayer = data.prayers.find(p => p.id === id);
+    if (!prayer) return;
+    prayer.status = newStatus;
+    saveData();
+    renderAll();
+  }
+
+  function removePrayer(id) {
+    data.prayers = data.prayers.filter(p => p.id !== id);
+    if (editingAnswerId === id) editingAnswerId = null;
+    saveData();
+    renderAll();
+  }
+
+  function openAnswerEditor(id) {
+    editingAnswerId = id;
+    renderAll();
+  }
+
+  function saveAnswer(id, text) {
+    const prayer = data.prayers.find(p => p.id === id);
+    if (!prayer) return;
+    prayer.answerText = text;
+    prayer.dateAnswered = todayStr();
+    editingAnswerId = null;
+    saveData();
+    renderAll();
+  }
+
+  // ============ Rendering ============
+  function renderColumn(containerId, status) {
+    const container = document.getElementById(containerId);
+    const items = data.prayers.filter(p => p.status === status);
+
+    if (items.length === 0) {
+      container.innerHTML = `<div class="empty-col">Nothing here yet.</div>`;
+      return;
+    }
+
+    container.innerHTML = items.map(p => {
+      const isAnswered = status === 'answered';
+      const clickHandler = status === 'new'
+        ? `movePrayer('${p.id}', 'ongoing')`
+        : status === 'ongoing'
+          ? `movePrayer('${p.id}', 'answered')`
+          : `openAnswerEditor('${p.id}')`;
+
+      let extraHtml = '';
+      if (isAnswered) {
+        if (editingAnswerId === p.id) {
+          extraHtml = `
+            <div class="answer-input-row" onclick="event.stopPropagation()">
+              <input type="text" id="answerInput-${p.id}" placeholder="How did you see this answered?" value="${escapeHtml(p.answerText || '')}">
+            </div>
+          `;
+        } else if (p.answerText) {
+          extraHtml = `<div class="prayer-answer-text">${escapeHtml(p.answerText)} &mdash; ${prettyDate(p.dateAnswered)}</div>`;
+        }
+      }
+
+      return `
+        <div class="prayer-item ${isAnswered ? 'answered' : ''}" onclick="${clickHandler}">
+          <button class="prayer-remove" onclick="event.stopPropagation(); removePrayer('${p.id}')" title="Delete">&times;</button>
+          <div class="prayer-line">${escapeHtml(p.text)}</div>
+          <div class="prayer-date">${prettyDate(p.dateAdded)}</div>
+          ${extraHtml}
+        </div>
+      `;
+    }).join('');
+
+    if (editingAnswerId) {
+      const input = document.getElementById(`answerInput-${editingAnswerId}`);
+      if (input) {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            const text = input.value.trim();
+            if (text) saveAnswer(editingAnswerId, text);
+          }
+        });
+      }
+    }
+  }
+
+  function renderAll() {
+    renderColumn('newPrayerList', 'new');
+    renderColumn('ongoingPrayerList', 'ongoing');
+    renderColumn('answeredPrayerList', 'answered');
+  }
+
+  const newPrayerInput = document.getElementById('newPrayerInput');
+  newPrayerInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const text = newPrayerInput.value.trim();
+      if (!text) return;
+      addPrayer(text);
+      newPrayerInput.value = '';
+    }
+  });
+
+  loadLordsPrayer();
+  renderAll();
+</script>
 
 </body>
 </html>
