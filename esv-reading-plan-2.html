@@ -217,6 +217,20 @@
     margin-right: 1px;
   }
 
+  .chapter-marker {
+    font-size: 13pt;
+    font-weight: 700;
+    color: var(--maroon);
+    margin: 18px 0 8px 0;
+    padding-top: 12px;
+    border-top: 1px dashed var(--paper-line);
+  }
+  .book-chapter-block .chapter-marker:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+  }
+
   .loading-state, .error-state, .empty-state {
     font-size: 14px;
     color: var(--ink-soft);
@@ -269,6 +283,78 @@
     color: var(--ink-soft);
     font-style: italic;
   }
+
+  .field-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .field-row input[type=text] { flex: 1; }
+
+  .flashcard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 22px;
+  }
+
+  .flashcard {
+    perspective: 1200px;
+    height: 160px;
+    cursor: pointer;
+  }
+
+  .flashcard-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.5s;
+    transform-style: preserve-3d;
+  }
+  .flashcard.flipped .flashcard-inner {
+    transform: rotateY(180deg);
+  }
+
+  .flashcard-face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    padding: 16px;
+    text-align: center;
+    box-shadow: 0 1px 4px var(--shadow);
+  }
+
+  .flashcard-front {
+    background: var(--card);
+    color: var(--maroon);
+    font-weight: 700;
+    font-size: 16px;
+  }
+
+  .flashcard-back {
+    background: var(--maroon);
+    color: var(--paper);
+    transform: rotateY(180deg);
+    font-family: Georgia, serif;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-y: auto;
+  }
+
+  .flashcard-delete {
+    all: unset;
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--ink-soft);
+    z-index: 2;
+  }
+  .flashcard-delete:hover { color: var(--maroon); }
 
   textarea {
     width: 100%;
@@ -413,6 +499,7 @@
     <button data-view="today" class="active">Today</button>
     <button data-view="previous">Previous Days</button>
     <button data-view="search">Search Notes</button>
+    <button data-view="memorize">Memorize</button>
   </nav>
 </header>
 
@@ -489,6 +576,7 @@
     const params = new URLSearchParams({
       q: query,
       'include-verse-numbers': 'true',
+      'include-chapter-numbers': 'true',
       'include-headings': 'true',
       'include-footnotes': 'false',
       'include-short-copyright': 'false',
@@ -515,15 +603,38 @@
     return texts;
   }
 
+  async function fetchVerseText(reference) {
+    const params = new URLSearchParams({
+      q: reference,
+      'include-verse-numbers': 'false',
+      'include-headings': 'false',
+      'include-footnotes': 'false',
+      'include-short-copyright': 'false',
+      'include-passage-references': 'false',
+    });
+    const res = await fetch(`${ESV_API_URL}?${params.toString()}`, {
+      headers: { 'Authorization': `Token ${ESV_API_KEY}` }
+    });
+    if (!res.ok) {
+      throw new Error(`ESV API returned ${res.status}`);
+    }
+    const json = await res.json();
+    return (json.passages || []).join(' ').replace(/\s+/g, ' ').trim();
+  }
+
   // ============ Storage ============
   const STORAGE_KEY = 'esv_reading_plan_v1';
 
   function loadData() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (!parsed.memorization) parsed.memorization = [];
+        return parsed;
+      }
     } catch (e) { console.error('Load failed', e); }
-    return { currentDayIndex: 0, notes: {}, passageCache: {} };
+    return { currentDayIndex: 0, notes: {}, passageCache: {}, memorization: [] };
   }
 
   function saveData() {
@@ -560,6 +671,7 @@
   function formatPassageHtml(passages) {
     return passages.map(p => {
       const escaped = escapeHtml(p.text)
+        .replace(/\[(\d+):(\d+)\]/g, '<div class="chapter-marker">Chapter $1</div><span class="verse-num">$2</span>')
         .replace(/\[(\d+)\]/g, '<span class="verse-num">$1</span>');
       return `<div class="book-chapter-block">${escaped}</div>`;
     }).join('');
@@ -624,6 +736,14 @@
             </div>
             <div class="complete-note" style="margin-top:8px;">Advances you to the next day's reading</div>
           </div>
+          <div class="card">
+            <div class="panel-title">Memorization</div>
+            <div class="field-row">
+              <input type="text" id="memoRefInput" placeholder="e.g. John 3:16">
+              <button class="btn" id="memoAddBtn">Add</button>
+            </div>
+            <div class="save-indicator" id="memoStatus"></div>
+          </div>
         </div>
       </div>
     `;
@@ -643,6 +763,10 @@
     });
 
     document.getElementById('completeBtn').addEventListener('click', () => markDayComplete(dayIndex));
+
+    const memoInput = document.getElementById('memoRefInput');
+    document.getElementById('memoAddBtn').addEventListener('click', submitMemoAdd);
+    memoInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitMemoAdd(); });
 
     await loadPassageInto(dayIndex);
   }
@@ -692,6 +816,65 @@
     data.currentDayIndex = dayIndex + 1;
     saveData();
     renderCurrentView();
+  }
+
+  // ============ Memorization ============
+  async function submitMemoAdd() {
+    const input = document.getElementById('memoRefInput');
+    const statusEl = document.getElementById('memoStatus');
+    const ref = input.value.trim();
+    if (!ref) return;
+    statusEl.textContent = 'Fetching verse...';
+    try {
+      const text = await fetchVerseText(ref);
+      if (!text) {
+        statusEl.textContent = "Couldn't find that reference — check the format (e.g. John 3:16).";
+        return;
+      }
+      data.memorization.push({ id: Date.now(), reference: ref, text, dateAdded: todayStr() });
+      saveData();
+      input.value = '';
+      statusEl.textContent = 'Added to Memorize.';
+      setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 1800);
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = `Couldn't fetch that verse (${err.message}).`;
+    }
+  }
+
+  function viewMemorize() {
+    if (data.memorization.length === 0) {
+      main.innerHTML = `
+        <div class="panel-title">Memorize</div>
+        <div class="card"><div class="empty-state">No verses added yet. Add one from the Memorization box on Today's page.</div></div>
+      `;
+      return;
+    }
+    main.innerHTML = `
+      <div class="panel-title">Memorize</div>
+      <div class="flashcard-grid">
+        ${data.memorization.map(m => `
+          <div class="flashcard" id="flashcard-${m.id}" onclick="toggleFlip(${m.id})">
+            <button class="flashcard-delete" onclick="event.stopPropagation(); deleteMemoCard(${m.id})" title="Remove">×</button>
+            <div class="flashcard-inner">
+              <div class="flashcard-face flashcard-front">${escapeHtml(m.reference)}</div>
+              <div class="flashcard-face flashcard-back">${escapeHtml(m.text)}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function toggleFlip(id) {
+    const card = document.getElementById(`flashcard-${id}`);
+    if (card) card.classList.toggle('flipped');
+  }
+
+  function deleteMemoCard(id) {
+    data.memorization = data.memorization.filter(m => m.id !== id);
+    saveData();
+    viewMemorize();
   }
 
   function deleteNote(dayIndex, onDone) {
@@ -859,7 +1042,7 @@
   }
 
   // ============ Router ============
-  const views = { today: viewToday, previous: viewPrevious, search: viewSearch };
+  const views = { today: viewToday, previous: viewPrevious, search: viewSearch, memorize: viewMemorize };
 
   function renderCurrentView() {
     updateHeaderSubtitle();
