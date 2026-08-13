@@ -454,6 +454,62 @@
     box-shadow: 0 4px 16px var(--shadow);
   }
 
+  .note-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--bg-line);
+  }
+
+  .note-tool-btn {
+    all: unset;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    border: 1px solid var(--bg-line);
+    color: var(--ink);
+    font-size: 14px;
+    background: #fff;
+  }
+  .note-tool-btn:hover { background: var(--bg); }
+  .note-tool-btn.b { font-weight: 700; }
+  .note-tool-btn.i { font-style: italic; }
+  .note-tool-btn.u { text-decoration: underline; }
+
+  .note-tool-divider {
+    width: 1px;
+    height: 22px;
+    background: var(--bg-line);
+    margin: 0 4px;
+  }
+
+  #fontSizeSelect {
+    font-family: Georgia, serif;
+    font-size: 13px;
+    padding: 6px 8px;
+    border: 1px solid var(--bg-line);
+    border-radius: 4px;
+    background: #fff;
+    color: var(--ink);
+  }
+
+  #fontColorPicker {
+    width: 32px;
+    height: 32px;
+    padding: 2px;
+    border: 1px solid var(--bg-line);
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+  }
+
   #bookNoteInput {
     width: 100%;
     min-height: 420px;
@@ -465,13 +521,20 @@
     border-radius: 4px;
     background: #fff;
     color: var(--ink);
-    resize: vertical;
+    overflow-y: auto;
   }
   #bookNoteInput:focus {
     outline: none;
     border-color: var(--gold);
     box-shadow: 0 0 0 2px rgba(176,141,62,0.2);
   }
+  #bookNoteInput:empty::before {
+    content: attr(data-placeholder);
+    color: #a39a86;
+    font-style: italic;
+  }
+  #bookNoteInput ul, #bookNoteInput ol { margin: 6px 0; padding-left: 26px; }
+  #bookNoteInput li { margin-bottom: 4px; }
 
   .note-box-footer {
     display: flex;
@@ -669,8 +732,18 @@
   }
 
   // ============ Book detail & notes ============
-  function firstLine(text) {
-    const line = (text || '').split('\n').map(l => l.trim()).find(l => l.length > 0);
+  function htmlToTextWithBreaks(html) {
+    const withBreaks = (html || '')
+      .replace(/<\/(div|p|li)>/gi, '\n')
+      .replace(/<br\s*\/?>/gi, '\n');
+    const tmp = document.createElement('div');
+    tmp.innerHTML = withBreaks;
+    return tmp.textContent || tmp.innerText || '';
+  }
+
+  function firstLine(html) {
+    const text = htmlToTextWithBreaks(html);
+    const line = text.split('\n').map(l => l.trim()).find(l => l.length > 0);
     return line ? (line.length > 60 ? line.slice(0, 60) + '…' : line) : '(untitled note)';
   }
 
@@ -739,7 +812,23 @@
 
         <div class="book-detail-right">
           <div class="note-box-card">
-            <textarea id="bookNoteInput" placeholder="Write your notes on this book...">${escapeHtml(editingNote ? editingNote.text : '')}</textarea>
+            <div class="note-toolbar">
+              <button class="note-tool-btn b" data-cmd="bold" title="Bold">B</button>
+              <button class="note-tool-btn i" data-cmd="italic" title="Italic">I</button>
+              <button class="note-tool-btn u" data-cmd="underline" title="Underline">U</button>
+              <div class="note-tool-divider"></div>
+              <button class="note-tool-btn" data-cmd="insertUnorderedList" title="Bullet list">&#8226;</button>
+              <button class="note-tool-btn" data-cmd="insertOrderedList" title="Numbered list">1.</button>
+              <div class="note-tool-divider"></div>
+              <select id="fontSizeSelect" title="Font size">
+                <option value="2">Small</option>
+                <option value="3" selected>Normal</option>
+                <option value="5">Large</option>
+                <option value="7">Huge</option>
+              </select>
+              <input type="color" id="fontColorPicker" title="Font color" value="#23261f">
+            </div>
+            <div id="bookNoteInput" contenteditable="true" data-placeholder="Write your notes on this book...">${editingNote ? editingNote.text : ''}</div>
             <div class="note-box-footer">
               <button class="btn" id="saveBookNoteBtn">Save</button>
               ${editingNote ? '<span class="editing-hint">Editing a previous note</span>' : ''}
@@ -749,6 +838,24 @@
       </div>
     `;
 
+    const noteEditor = document.getElementById('bookNoteInput');
+    try { document.execCommand('defaultParagraphSeparator', false, 'div'); } catch (e) {}
+
+    document.querySelectorAll('.note-tool-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        noteEditor.focus();
+        document.execCommand(btn.dataset.cmd);
+      });
+    });
+    document.getElementById('fontSizeSelect').addEventListener('change', (e) => {
+      noteEditor.focus();
+      document.execCommand('fontSize', false, e.target.value);
+    });
+    document.getElementById('fontColorPicker').addEventListener('input', (e) => {
+      noteEditor.focus();
+      document.execCommand('foreColor', false, e.target.value);
+    });
+
     document.getElementById('saveBookNoteBtn').addEventListener('click', saveBookNote);
   }
 
@@ -757,25 +864,31 @@
     renderBookDetail();
   }
 
+  function htmlToPlainText(html) {
+    const div = document.createElement('div');
+    div.innerHTML = html || '';
+    return (div.textContent || div.innerText || '').trim();
+  }
+
   function saveBookNote() {
     const book = data.books.find(b => b.id === selectedBookId);
     if (!book) return;
     if (!book.notes) book.notes = [];
 
-    const textarea = document.getElementById('bookNoteInput');
-    const text = textarea.value.trim();
-    if (!text) return;
+    const noteEditor = document.getElementById('bookNoteInput');
+    const html = noteEditor.innerHTML;
+    if (!htmlToPlainText(html)) return;
 
     if (editingNoteId) {
       const note = book.notes.find(n => n.id === editingNoteId);
       if (note) {
-        note.text = text;
+        note.text = html;
         note.dateSaved = new Date().toISOString();
       }
     } else {
       book.notes.unshift({
         id: Date.now(),
-        text,
+        text: html,
         dateSaved: new Date().toISOString(),
       });
     }
