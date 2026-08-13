@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spanish I &amp; II</title>
+<style>
+  :root {
+    --bg: #FAF3E8;
+    --card: #FFFFFF;
+    --ink: #2B2320;
+    --ink-soft: #7a6f64;
+    --terracotta: #C1553A;
+    --terracotta-soft: #D97354;
+    --teal: #2A6F77;
+    --teal-soft: #3C8A93;
+    --gold: #C9A24B;
+    --border: #E8DCC8;
+    --shadow: rgba(43, 35, 32, 0.10);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: Georgia, 'Times New Roman', serif;
+    color: var(--ink);
+    background: var(--bg);
+  }
+
+  .banner-wrap {
+    position: relative;
+    width: 100%;
+    max-height: 260px;
+    overflow: hidden;
+  }
+  .banner-wrap img {
+    width: 100%;
+    display: block;
+    object-fit: cover;
+    object-position: center 60%;
+  }
+
+  .home-link {
+    all: unset;
+    cursor: pointer;
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.92);
+    color: var(--terracotta);
+    font-size: 17px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .home-link:hover { background: #fff; }
+
+  .page-title-bar {
+    text-align: center;
+    padding: 18px 20px 6px;
+  }
+  .page-title-bar h1 {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--terracotta);
+    letter-spacing: 0.01em;
+  }
+  .page-title-bar .sub {
+    margin-top: 4px;
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--teal);
+    font-weight: 700;
+  }
+
+  .layout {
+    display: flex;
+    gap: 24px;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px 24px 60px;
+    align-items: flex-start;
+  }
+
+  .subject-sidebar {
+    width: 180px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: sticky;
+    top: 20px;
+  }
+
+  .subject-btn {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 14px;
+    box-shadow: 0 3px 10px var(--shadow);
+    transition: border-color 0.15s ease, transform 0.15s ease;
+  }
+  .subject-btn:hover { transform: translateY(-2px); }
+  .subject-btn .subject-label {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .subject-btn.active {
+    border-color: var(--terracotta);
+    background: #FFF8F2;
+  }
+  .subject-btn.active .subject-label { color: var(--terracotta); }
+
+  .subject-icon {
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .subject-icon img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  .content-area {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .content-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px 30px;
+    box-shadow: 0 4px 16px var(--shadow);
+    min-height: 400px;
+  }
+
+  .content-placeholder {
+    color: var(--ink-soft);
+    font-style: italic;
+    font-size: 14px;
+    text-align: center;
+    padding: 60px 20px;
+  }
+
+  .content-heading {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--terracotta);
+    margin-bottom: 4px;
+  }
+  .content-subheading {
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--teal);
+    font-weight: 700;
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ---------- New lesson plan input + list ---------- */
+  .new-lesson-row input[type=text] {
+    width: 100%;
+    font-family: Georgia, serif;
+    font-size: 15px;
+    padding: 11px 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--ink);
+  }
+  .new-lesson-row input[type=text]:focus {
+    outline: none;
+    border-color: var(--terracotta);
+    box-shadow: 0 0 0 2px rgba(193,85,58,0.15);
+  }
+  .new-lesson-row input[type=text]::placeholder { color: #b3a795; font-style: italic; }
+
+  .lesson-list {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .lesson-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #FFFBF5;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    cursor: pointer;
+  }
+  .lesson-item:hover { border-color: var(--terracotta); }
+
+  .lesson-item-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .lesson-item-date {
+    font-size: 11px;
+    color: var(--ink-soft);
+    font-style: italic;
+    margin-top: 2px;
+  }
+
+  .lesson-item-remove {
+    all: unset;
+    cursor: pointer;
+    font-size: 16px;
+    color: var(--ink-soft);
+    padding: 4px 8px;
+  }
+  .lesson-item-remove:hover { color: #b13c2c; }
+
+  /* ---------- Rich text editor (lesson content) ---------- */
+  .editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .editor-tool-btn {
+    all: unset;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    color: var(--ink);
+    font-size: 14px;
+    background: #fff;
+  }
+  .editor-tool-btn:hover { background: var(--bg); }
+  .editor-tool-btn.b { font-weight: 700; }
+  .editor-tool-btn.i { font-style: italic; }
+  .editor-tool-btn.u { text-decoration: underline; }
+
+  .editor-tool-divider {
+    width: 1px;
+    height: 22px;
+    background: var(--border);
+    margin: 0 4px;
+  }
+
+  #lessonFontSize {
+    font-family: Georgia, serif;
+    font-size: 13px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: #fff;
+    color: var(--ink);
+  }
+
+  #lessonFontColor {
+    width: 32px;
+    height: 32px;
+    padding: 2px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+  }
+
+  #lessonEditor {
+    min-height: 400px;
+    font-family: Georgia, serif;
+    font-size: 15px;
+    line-height: 1.7;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: #fff;
+    color: var(--ink);
+    overflow-y: auto;
+  }
+  #lessonEditor:focus {
+    outline: none;
+    border-color: var(--terracotta);
+    box-shadow: 0 0 0 2px rgba(193,85,58,0.15);
+  }
+  #lessonEditor:empty::before {
+    content: attr(data-placeholder);
+    color: #b3a795;
+    font-style: italic;
+  }
+  #lessonEditor ul, #lessonEditor ol { margin: 6px 0; padding-left: 26px; }
+  #lessonEditor li { margin-bottom: 4px; }
+
+  .editor-footer {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 16px;
+  }
+
+  .lesson-back-link {
+    all: unset;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--teal);
+    font-weight: 700;
+    margin-bottom: 14px;
+    display: inline-block;
+  }
+  .lesson-back-link:hover { text-decoration: underline; }
+
+  .btn {
+    all: unset;
+    cursor: pointer;
+    font-family: Georgia, serif;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 10px 20px;
+    border-radius: 5px;
+    background: var(--terracotta);
+    color: #fff;
+    text-align: center;
+  }
+  .btn:hover { background: var(--terracotta-soft); }
+
+  @media (max-width: 700px) {
+    .layout { flex-direction: column; }
+    .subject-sidebar {
+      width: 100%;
+      flex-direction: row;
+      position: static;
+    }
+    .subject-btn { flex: 1; }
+  }
+</style>
+</head>
+<body>
+
+<div class="banner-wrap">
+  <a class="home-link" href="index.html" title="Back to workspace">&#8962;</a>
+  <img src="banner-spanish.jpg" alt="">
+</div>
+
+<div class="page-title-bar">
+  <h1>Spanish I &amp; II</h1>
+  <div class="sub">Course Resources</div>
+</div>
+
+<div class="layout">
+  <div class="subject-sidebar">
+    <button class="subject-btn active" data-subject="spanish1" id="btnSpanish1">
+      <span class="subject-label">Spanish I</span>
+      <div class="subject-icon"><img src="bull-icon.png" alt="Bull icon"></div>
+    </button>
+    <button class="subject-btn" data-subject="spanish2" id="btnSpanish2">
+      <span class="subject-label">Spanish II</span>
+      <div class="subject-icon"><img src="matador-icon.png" alt="Matador icon"></div>
+    </button>
+  </div>
+
+  <div class="content-area">
+    <div class="content-card" id="contentCard"></div>
+  </div>
+</div>
+
+<script>
+  const SUBJECT_KEY = 'spanish_course_selected_subject';
+  const LESSONS_KEY = 'spanish_lessons_v1';
+
+  function getSelectedSubject() {
+    try { return localStorage.getItem(SUBJECT_KEY) || 'spanish1'; }
+    catch (e) { return 'spanish1'; }
+  }
+  function setSelectedSubject(subject) {
+    try { localStorage.setItem(SUBJECT_KEY, subject); }
+    catch (e) { console.error(e); }
+  }
+
+  function loadLessons() {
+    try {
+      const raw = localStorage.getItem(LESSONS_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) { console.error(e); }
+    return { spanish1: [], spanish2: [] };
+  }
+  function saveLessons() {
+    try { localStorage.setItem(LESSONS_KEY, JSON.stringify(lessonData)); }
+    catch (e) { console.error(e); }
+  }
+
+  let lessonData = loadLessons();
+  let editingLessonId = null;
+
+  function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str || '';
+    return d.innerHTML;
+  }
+
+  function htmlToPlainText(html) {
+    const div = document.createElement('div');
+    div.innerHTML = html || '';
+    return (div.textContent || div.innerText || '').trim();
+  }
+
+  function prettyDateTime(iso) {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) +
+      ' at ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }
+
+  const SUBJECT_LABELS = { spanish1: 'Spanish I', spanish2: 'Spanish II' };
+
+  function renderContent(subject) {
+    const editingLesson = editingLessonId
+      ? (lessonData[subject] || []).find(l => l.id === editingLessonId)
+      : null;
+
+    if (editingLesson) {
+      renderLessonEditor(subject, editingLesson);
+    } else {
+      renderLessonList(subject);
+    }
+  }
+
+  function renderLessonList(subject) {
+    const card = document.getElementById('contentCard');
+    const lessons = [...(lessonData[subject] || [])].sort((a, b) => new Date(b.createdDate) - new Date(a.createdDate));
+
+    card.innerHTML = `
+      <div class="content-heading">${SUBJECT_LABELS[subject]}</div>
+      <div class="content-subheading">Course Resources</div>
+      <div class="new-lesson-row">
+        <input type="text" id="newLessonInput" placeholder="New Lesson Plan?">
+      </div>
+      <div class="lesson-list" id="lessonListContainer">
+        ${lessons.length === 0
+          ? `<div class="content-placeholder">No lesson plans yet. Type a name above and hit Enter to add one.</div>`
+          : lessons.map(l => `
+              <div class="lesson-item" onclick="openLesson('${l.id}')">
+                <div>
+                  <div class="lesson-item-title">${escapeHtml(l.title)}</div>
+                  <div class="lesson-item-date">${prettyDateTime(l.createdDate)}</div>
+                </div>
+                <button class="lesson-item-remove" onclick="event.stopPropagation(); deleteLesson('${l.id}')" title="Delete">&times;</button>
+              </div>
+            `).join('')
+        }
+      </div>
+    `;
+
+    const input = document.getElementById('newLessonInput');
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const title = input.value.trim();
+        if (!title) return;
+        addLesson(subject, title);
+      }
+    });
+    input.focus();
+  }
+
+  function addLesson(subject, title) {
+    if (!lessonData[subject]) lessonData[subject] = [];
+    const lesson = {
+      id: 'l' + Date.now(),
+      title,
+      content: '',
+      createdDate: new Date().toISOString(),
+      updatedDate: new Date().toISOString(),
+    };
+    lessonData[subject].unshift(lesson);
+    saveLessons();
+    renderLessonList(subject);
+  }
+
+  function deleteLesson(lessonId) {
+    const subject = getSelectedSubject();
+    lessonData[subject] = (lessonData[subject] || []).filter(l => l.id !== lessonId);
+    if (editingLessonId === lessonId) editingLessonId = null;
+    saveLessons();
+    renderContent(subject);
+  }
+
+  function openLesson(lessonId) {
+    editingLessonId = lessonId;
+    renderContent(getSelectedSubject());
+  }
+
+  function renderLessonEditor(subject, lesson) {
+    const card = document.getElementById('contentCard');
+    card.innerHTML = `
+      <button class="lesson-back-link" onclick="closeLessonEditor()">&larr; Back to Course Resources</button>
+      <div class="content-heading">${escapeHtml(lesson.title)}</div>
+      <div class="content-subheading">${SUBJECT_LABELS[subject]}</div>
+
+      <div class="editor-toolbar">
+        <button class="editor-tool-btn b" data-cmd="bold" title="Bold">B</button>
+        <button class="editor-tool-btn i" data-cmd="italic" title="Italic">I</button>
+        <button class="editor-tool-btn u" data-cmd="underline" title="Underline">U</button>
+        <div class="editor-tool-divider"></div>
+        <button class="editor-tool-btn" data-cmd="insertUnorderedList" title="Bullet list">&#8226;</button>
+        <button class="editor-tool-btn" data-cmd="insertOrderedList" title="Numbered list">1.</button>
+        <div class="editor-tool-divider"></div>
+        <select id="lessonFontSize" title="Font size">
+          <option value="2">Small</option>
+          <option value="3" selected>Normal</option>
+          <option value="5">Large</option>
+          <option value="7">Huge</option>
+        </select>
+        <input type="color" id="lessonFontColor" title="Font color" value="#2b2320">
+      </div>
+
+      <div id="lessonEditor" contenteditable="true" data-placeholder="Write this lesson plan...">${lesson.content || ''}</div>
+
+      <div class="editor-footer">
+        <button class="btn" id="saveLessonBtn">Save</button>
+      </div>
+    `;
+
+    const lessonEditor = document.getElementById('lessonEditor');
+    try { document.execCommand('defaultParagraphSeparator', false, 'div'); } catch (e) {}
+
+    document.querySelectorAll('.editor-tool-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        lessonEditor.focus();
+        document.execCommand(btn.dataset.cmd);
+      });
+    });
+    document.getElementById('lessonFontSize').addEventListener('change', (e) => {
+      lessonEditor.focus();
+      document.execCommand('fontSize', false, e.target.value);
+    });
+    document.getElementById('lessonFontColor').addEventListener('input', (e) => {
+      lessonEditor.focus();
+      document.execCommand('foreColor', false, e.target.value);
+    });
+
+    document.getElementById('saveLessonBtn').addEventListener('click', () => saveLesson(subject, lesson.id));
+  }
+
+  function saveLesson(subject, lessonId) {
+    const lessonEditor = document.getElementById('lessonEditor');
+    const html = lessonEditor.innerHTML;
+    const lesson = (lessonData[subject] || []).find(l => l.id === lessonId);
+    if (lesson) {
+      lesson.content = html;
+      lesson.updatedDate = new Date().toISOString();
+    }
+    saveLessons();
+    editingLessonId = null;
+    renderContent(subject);
+  }
+
+  function closeLessonEditor() {
+    editingLessonId = null;
+    renderContent(getSelectedSubject());
+  }
+
+  function selectSubject(subject) {
+    setSelectedSubject(subject);
+    editingLessonId = null;
+    document.getElementById('btnSpanish1').classList.toggle('active', subject === 'spanish1');
+    document.getElementById('btnSpanish2').classList.toggle('active', subject === 'spanish2');
+    renderContent(subject);
+  }
+
+  document.getElementById('btnSpanish1').addEventListener('click', () => selectSubject('spanish1'));
+  document.getElementById('btnSpanish2').addEventListener('click', () => selectSubject('spanish2'));
+
+  selectSubject(getSelectedSubject());
+</script>
+
+</body>
+</html>
