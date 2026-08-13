@@ -31,7 +31,7 @@
   }
 
   .wrap {
-    max-width: 760px;
+    max-width: 660px;
     margin: 0 auto;
     padding: 64px 24px 80px;
   }
@@ -65,24 +65,27 @@
     font-style: italic;
   }
 
-  .links {
-    display: flex;
-    flex-direction: column;
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 18px;
   }
 
   .link-card {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 18px;
+    text-align: center;
+    gap: 12px;
     background: var(--card);
     border: 1px solid var(--bg-line);
     border-radius: 8px;
-    padding: 22px 24px;
+    padding: 24px 18px;
     text-decoration: none;
     color: inherit;
     box-shadow: 0 4px 16px var(--shadow);
     transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    cursor: pointer;
   }
 
   .link-card:hover {
@@ -92,8 +95,8 @@
   }
 
   .link-icon {
-    width: 52px;
-    height: 52px;
+    width: 56px;
+    height: 56px;
     flex-shrink: 0;
     border-radius: 50%;
     background: var(--forest);
@@ -109,24 +112,80 @@
     object-fit: cover;
   }
 
-  .link-body { flex: 1; min-width: 0; }
-
   .link-title {
-    font-size: 17px;
+    font-size: 16px;
     font-weight: 700;
     color: var(--forest);
-    margin-bottom: 3px;
+    line-height: 1.3;
   }
 
   .link-desc {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--ink-soft);
+    line-height: 1.4;
   }
 
-  .link-arrow {
-    font-size: 16px;
+  .link-chevron {
+    font-size: 12px;
     color: var(--gold);
+    transition: transform 0.2s ease;
+  }
+  .link-card.expanded .link-chevron {
+    transform: rotate(180deg);
+  }
+
+  .submenu {
+    display: none;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 18px;
+    padding: 18px;
+    background: rgba(255,255,255,0.5);
+    border: 1px dashed var(--bg-line);
+    border-radius: 8px;
+  }
+  .submenu.open { display: grid; }
+
+  .sub-link-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--card);
+    border: 1px solid var(--bg-line);
+    border-radius: 6px;
+    padding: 14px 16px;
+    text-decoration: none;
+    color: inherit;
+    box-shadow: 0 2px 8px var(--shadow);
+    transition: transform 0.15s ease, border-color 0.15s ease;
+  }
+  .sub-link-card:hover {
+    transform: translateY(-1px);
+    border-color: var(--gold);
+  }
+
+  .sub-link-icon {
+    width: 38px;
+    height: 38px;
     flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--forest);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sub-link-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .sub-link-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--forest);
+    line-height: 1.25;
   }
 
   footer {
@@ -135,6 +194,10 @@
     font-size: 11px;
     color: var(--ink-soft);
     font-style: italic;
+  }
+
+  @media (max-width: 480px) {
+    .submenu { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -147,64 +210,63 @@
     <div class="sub">A home for daily reading, notes, and sermon prep</div>
   </header>
 
-  <div class="links">
-    <a class="link-card" href="esv-reading-plan-2.html">
-      <div class="link-icon"><img src="bible.png" alt=""></div>
-      <div class="link-body">
-        <div class="link-title">Daily Bible Reading</div>
-        <div class="link-desc">Five chapters a day, Genesis through Revelation, with notes and memorization</div>
-      </div>
-      <div class="link-arrow">&#8594;</div>
-    </a>
-
+  <div class="main-grid">
     <a class="link-card" href="bujo.html">
       <div class="link-icon"><img src="journal.png" alt=""></div>
-      <div class="link-body">
-        <div class="link-title">Bullet Journal</div>
-        <div class="link-desc">Rapid logging, monthly log, collections, and search</div>
-      </div>
-      <div class="link-arrow">&#8594;</div>
-    </a>
-
-    <a class="link-card" href="sermon-prep-4.html">
-      <div class="link-icon"><img src="writing.png" alt=""></div>
-      <div class="link-body">
-        <div class="link-title">Sermon Preparation</div>
-        <div class="link-desc">Passage lookup, notes, archive, and outline synthesis</div>
-      </div>
-      <div class="link-arrow">&#8594;</div>
-    </a>
-
-    <a class="link-card" href="readings.html">
-      <div class="link-icon"><img src="books.png" alt=""></div>
-      <div class="link-body">
-        <div class="link-title">Readings</div>
-        <div class="link-desc">Reading list and notes</div>
-      </div>
-      <div class="link-arrow">&#8594;</div>
+      <div class="link-title">Bullet Journal</div>
+      <div class="link-desc">Rapid logging, monthly log, collections, and search</div>
     </a>
 
     <a class="link-card" href="kc-baseball.html">
       <div class="link-icon"><img src="kc-baseball.jpeg" alt=""></div>
-      <div class="link-body">
-        <div class="link-title">KC Baseball</div>
-        <div class="link-desc">Team resources and notes</div>
-      </div>
-      <div class="link-arrow">&#8594;</div>
+      <div class="link-title">KC Baseball</div>
+      <div class="link-desc">Team resources and notes</div>
     </a>
+
+    <div class="link-card" id="trueVineToggle">
+      <div class="link-icon"><img src="truevine-icon.png" alt=""></div>
+      <div class="link-title">True Vine Community Church</div>
+      <div class="link-desc">Bible reading, sermon prep, readings, and prayer</div>
+      <div class="link-chevron">&#9660;</div>
+    </div>
 
     <a class="link-card" href="spanish.html">
       <div class="link-icon"><img src="trinity-prep.png" alt=""></div>
-      <div class="link-body">
-        <div class="link-title">Trinity Prep</div>
-        <div class="link-desc">Spanish I and Spanish II</div>
-      </div>
-      <div class="link-arrow">&#8594;</div>
+      <div class="link-title">Trinity Prep</div>
+      <div class="link-desc">Spanish I and Spanish II</div>
+    </a>
+  </div>
+
+  <div class="submenu" id="trueVineSubmenu">
+    <a class="sub-link-card" href="esv-reading-plan-2.html">
+      <div class="sub-link-icon"><img src="bible.png" alt=""></div>
+      <div class="sub-link-title">Daily Bible Reading</div>
+    </a>
+    <a class="sub-link-card" href="sermon-prep-4.html">
+      <div class="sub-link-icon"><img src="writing.png" alt=""></div>
+      <div class="sub-link-title">Sermon Preparation</div>
+    </a>
+    <a class="sub-link-card" href="readings.html">
+      <div class="sub-link-icon"><img src="books.png" alt=""></div>
+      <div class="sub-link-title">Readings</div>
+    </a>
+    <a class="sub-link-card" href="prayer.html">
+      <div class="sub-link-icon"><img src="prayer-icon.png" alt=""></div>
+      <div class="sub-link-title">Prayer</div>
     </a>
   </div>
 
   <footer>Private workspace &middot; built for personal use</footer>
 </div>
+
+<script>
+  const toggle = document.getElementById('trueVineToggle');
+  const submenu = document.getElementById('trueVineSubmenu');
+  toggle.addEventListener('click', () => {
+    toggle.classList.toggle('expanded');
+    submenu.classList.toggle('open');
+  });
+</script>
 
 </body>
 </html>
