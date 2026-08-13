@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nate's Library</title>
+<style>
+  :root {
+    --bg: #F6F3EC;
+    --bg-line: #E5DFCE;
+    --ink: #23261F;
+    --ink-soft: #6b6a5f;
+    --forest: #2F4A3C;
+    --forest-soft: #4A6B57;
+    --gold: #B08D3E;
+    --gold-bright: #C9A24B;
+    --card: #FFFFFF;
+    --shadow: rgba(35, 38, 31, 0.08);
+    --on-bg: #F3ECDD;
+    --on-bg-soft: rgba(243, 236, 221, 0.78);
+    --text-shadow: 0 1px 4px rgba(0,0,0,0.65);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: Georgia, 'Times New Roman', serif;
+    color: var(--ink);
+    background-color: #2a2018;
+    background-image:
+      linear-gradient(rgba(20,14,8,0.5), rgba(20,14,8,0.5)),
+      url('cafe-background.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+  }
+
+  .wrap {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 12px;
+    position: relative;
+  }
+
+  .home-link {
+    all: unset;
+    cursor: pointer;
+    position: absolute;
+    top: 4px;
+    left: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.9);
+    border: 1px solid rgba(255,255,255,0.4);
+    color: var(--forest);
+    font-size: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .home-link:hover { background: #fff; }
+
+  header .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--gold-bright);
+    font-weight: 700;
+    margin-bottom: 10px;
+    text-shadow: var(--text-shadow);
+  }
+
+  header h1 {
+    margin: 0;
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--on-bg);
+    letter-spacing: 0.01em;
+    text-shadow: var(--text-shadow);
+  }
+
+  .search-card {
+    background: var(--card);
+    border: 1px solid var(--bg-line);
+    border-radius: 8px;
+    padding: 20px 22px;
+    margin: 32px 0 36px;
+    box-shadow: 0 4px 16px var(--shadow);
+  }
+
+  .field-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  input[type=text] {
+    flex: 1;
+    min-width: 220px;
+    font-family: Georgia, serif;
+    font-size: 15px;
+    padding: 11px 14px;
+    border: 1px solid var(--bg-line);
+    border-radius: 4px;
+    background: #fff;
+    color: var(--ink);
+  }
+  input[type=text]:focus {
+    outline: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 2px rgba(176,141,62,0.2);
+  }
+  input[type=text]::placeholder { color: #a39a86; font-style: italic; }
+
+  .btn {
+    all: unset;
+    cursor: pointer;
+    font-family: Georgia, serif;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 11px 20px;
+    border-radius: 4px;
+    background: var(--forest);
+    color: #fff;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .btn:hover { background: var(--forest-soft); }
+  .btn.subtle {
+    background: transparent;
+    color: var(--forest);
+    border: 1px solid var(--forest);
+  }
+
+  .search-status {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    font-style: italic;
+    min-height: 14px;
+  }
+  .search-status.error { color: #9c3b34; }
+
+  .result-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  .result-card {
+    background: #fff;
+    border: 1px solid var(--bg-line);
+    border-radius: 6px;
+    padding: 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .result-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px var(--shadow);
+    border-color: var(--gold);
+  }
+
+  .result-cover {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    background: var(--bg-line);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .result-cover img { width: 100%; height: 100%; object-fit: cover; }
+  .result-cover .fallback {
+    font-size: 11px;
+    color: var(--ink-soft);
+    padding: 8px;
+    line-height: 1.3;
+  }
+
+  .result-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.3;
+    margin-bottom: 2px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .result-author {
+    font-size: 11px;
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 44px 0 18px;
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--gold-bright);
+    font-weight: 700;
+    text-shadow: var(--text-shadow);
+  }
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(243, 236, 221, 0.35);
+  }
+
+  .shelf {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 20px;
+  }
+
+  .shelf-item {
+    position: relative;
+    background: #fff;
+    border: 1px solid var(--bg-line);
+    border-radius: 6px;
+    padding: 12px;
+    box-shadow: 0 4px 12px var(--shadow);
+  }
+
+  .shelf-cover {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    background: var(--bg-line);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .shelf-cover img { width: 100%; height: 100%; object-fit: cover; }
+  .shelf-cover .fallback {
+    font-size: 11px;
+    color: var(--ink-soft);
+    padding: 8px;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  .shelf-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.3;
+    margin-bottom: 3px;
+  }
+  .shelf-author {
+    font-size: 11px;
+    color: var(--ink-soft);
+    font-style: italic;
+    margin-bottom: 8px;
+  }
+
+  .shelf-remove {
+    all: unset;
+    cursor: pointer;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.9);
+    color: var(--ink-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    box-shadow: 0 1px 4px var(--shadow);
+  }
+  .shelf-remove:hover { color: #9c3b34; }
+
+  .shelf-status-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .status-toggle {
+    all: unset;
+    cursor: pointer;
+    font-size: 10px;
+    padding: 4px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--bg-line);
+    color: var(--ink-soft);
+    background: rgba(255,255,255,0.85);
+  }
+  .status-toggle.active {
+    background: var(--forest);
+    color: #fff;
+    border-color: var(--forest);
+  }
+
+  .empty-state {
+    color: var(--on-bg-soft);
+    font-style: italic;
+    font-size: 13px;
+    text-align: center;
+    padding: 30px 20px;
+    text-shadow: var(--text-shadow);
+  }
+
+  /* ---------- Book detail view ---------- */
+  .book-detail-layout {
+    display: flex;
+    gap: 28px;
+    align-items: flex-start;
+  }
+
+  .book-detail-left {
+    width: 240px;
+    flex-shrink: 0;
+    animation: slideInLeft 0.32s ease;
+  }
+
+  @keyframes slideInLeft {
+    from { transform: translateX(50px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  .back-link {
+    all: unset;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--on-bg);
+    font-weight: 700;
+    margin-bottom: 16px;
+    display: inline-block;
+    text-shadow: var(--text-shadow);
+  }
+  .back-link:hover { text-decoration: underline; }
+
+  .detail-cover {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    background: var(--bg-line);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 14px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .detail-cover img { width: 100%; height: 100%; object-fit: cover; }
+  .detail-cover .fallback {
+    font-size: 13px;
+    color: var(--ink-soft);
+    text-align: center;
+    padding: 12px;
+  }
+
+  .detail-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--on-bg);
+    line-height: 1.3;
+    margin-bottom: 4px;
+    text-shadow: var(--text-shadow);
+  }
+  .detail-author {
+    font-size: 13px;
+    color: var(--on-bg-soft);
+    font-style: italic;
+    margin-bottom: 12px;
+    text-shadow: var(--text-shadow);
+  }
+
+  .note-preview-list {
+    margin-top: 22px;
+  }
+
+  .note-preview-title {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gold-bright);
+    font-weight: 700;
+    text-shadow: var(--text-shadow);
+    margin-bottom: 10px;
+  }
+
+  .note-preview-item {
+    background: #fff;
+    border: 1px solid var(--bg-line);
+    border-radius: 5px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    position: relative;
+  }
+  .note-preview-item:hover { border-color: var(--gold); }
+  .note-preview-item .npi-text {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.3;
+    padding-right: 16px;
+  }
+  .note-preview-item .npi-date {
+    font-size: 10px;
+    color: var(--ink-soft);
+    font-style: italic;
+    margin-top: 3px;
+  }
+  .note-preview-item .npi-remove {
+    all: unset;
+    cursor: pointer;
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+  .note-preview-item .npi-remove:hover { color: #9c3b34; }
+
+  .book-detail-right {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .note-box-card {
+    background: var(--card);
+    border: 1px solid var(--bg-line);
+    border-radius: 8px;
+    padding: 20px 22px;
+    box-shadow: 0 4px 16px var(--shadow);
+  }
+
+  #bookNoteInput {
+    width: 100%;
+    min-height: 420px;
+    font-family: Georgia, serif;
+    font-size: 15px;
+    line-height: 1.7;
+    padding: 12px 14px;
+    border: 1px solid var(--bg-line);
+    border-radius: 4px;
+    background: #fff;
+    color: var(--ink);
+    resize: vertical;
+  }
+  #bookNoteInput:focus {
+    outline: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 2px rgba(176,141,62,0.2);
+  }
+
+  .note-box-footer {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 14px;
+  }
+
+  .editing-hint {
+    font-size: 11px;
+    color: var(--gold);
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <a class="home-link" href="index.html" title="Back to workspace">&#8962;</a>
+    <div class="eyebrow">Personal Tools</div>
+    <h1>Nate's Library</h1>
+  </header>
+
+  <div id="shelfView">
+    <div class="search-card">
+      <div class="field-row">
+        <input type="text" id="searchInput" placeholder="Add to Library">
+        <button class="btn" id="searchBtn">Search</button>
+      </div>
+      <div class="search-status" id="searchStatus"></div>
+      <div id="resultGrid"></div>
+    </div>
+
+    <div class="section-title">My Shelf</div>
+    <div id="shelfContainer"></div>
+  </div>
+
+  <div id="detailView" style="display:none;"></div>
+</div>
+
+<script>
+  const STORAGE_KEY = 'nates_library_v1';
+
+  function loadData() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) { console.error(e); }
+    return { books: [] };
+  }
+
+  function saveData() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+    catch (e) { console.error(e); }
+  }
+
+  let data = loadData();
+  let selectedBookId = null;
+  let editingNoteId = null;
+
+  function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str || '';
+    return d.innerHTML;
+  }
+
+  // ============ Open Library search ============
+  async function searchBooks(query) {
+    const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=12&fields=key,title,author_name,cover_i,first_publish_year`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Search failed (${res.status})`);
+    const json = await res.json();
+    return (json.docs || []).map(d => ({
+      workKey: d.key,
+      title: d.title || 'Untitled',
+      author: (d.author_name && d.author_name[0]) || 'Unknown author',
+      year: d.first_publish_year || null,
+      coverId: d.cover_i || null,
+    }));
+  }
+
+  function coverUrl(coverId, size) {
+    if (!coverId) return null;
+    return `https://covers.openlibrary.org/b/id/${coverId}-${size}.jpg`;
+  }
+
+  let lastResults = [];
+
+  async function runSearch() {
+    const input = document.getElementById('searchInput');
+    const statusEl = document.getElementById('searchStatus');
+    const grid = document.getElementById('resultGrid');
+    const query = input.value.trim();
+    if (!query) return;
+
+    statusEl.textContent = 'Searching...';
+    statusEl.className = 'search-status';
+    grid.innerHTML = '';
+
+    try {
+      const results = await searchBooks(query);
+      lastResults = results;
+      if (results.length === 0) {
+        statusEl.textContent = `No results for "${query}".`;
+        return;
+      }
+      statusEl.textContent = '';
+      grid.innerHTML = `<div class="result-grid">` + results.map((b, i) => `
+        <div class="result-card" onclick="addToShelf(${i})">
+          <div class="result-cover">
+            ${b.coverId
+              ? `<img src="${coverUrl(b.coverId, 'M')}" alt="">`
+              : `<span class="fallback">${escapeHtml(b.title)}</span>`}
+          </div>
+          <div class="result-title">${escapeHtml(b.title)}</div>
+          <div class="result-author">${escapeHtml(b.author)}</div>
+        </div>
+      `).join('') + `</div>`;
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = `Couldn't search right now (${err.message}). Check your connection.`;
+      statusEl.className = 'search-status error';
+    }
+  }
+
+  function addToShelf(index) {
+    const book = lastResults[index];
+    if (!book) return;
+    if (data.books.some(b => b.workKey === book.workKey)) {
+      document.getElementById('searchStatus').textContent = 'Already on your shelf.';
+      return;
+    }
+    data.books.unshift({
+      id: Date.now(),
+      workKey: book.workKey,
+      title: book.title,
+      author: book.author,
+      year: book.year,
+      coverId: book.coverId,
+      status: 'want-to-read',
+      addedDate: new Date().toISOString(),
+    });
+    saveData();
+    document.getElementById('resultGrid').innerHTML = '';
+    document.getElementById('searchInput').value = '';
+    document.getElementById('searchStatus').textContent = `Added "${book.title}" to your shelf.`;
+    renderShelf();
+  }
+
+  function removeFromShelf(id) {
+    data.books = data.books.filter(b => b.id !== id);
+    saveData();
+    renderShelf();
+  }
+
+  function setStatus(id, status) {
+    const book = data.books.find(b => b.id === id);
+    if (book) book.status = status;
+    saveData();
+    renderShelf();
+  }
+
+  const STATUSES = [
+    { key: 'want-to-read', label: 'Want to Read' },
+    { key: 'reading', label: 'Reading' },
+    { key: 'read', label: 'Read' },
+  ];
+
+  function renderShelf() {
+    const container = document.getElementById('shelfContainer');
+    if (data.books.length === 0) {
+      container.innerHTML = `<div class="empty-state">Your shelf is empty. Search above to add your first book.</div>`;
+      return;
+    }
+    container.innerHTML = `<div class="shelf">` + data.books.map(b => `
+      <div class="shelf-item">
+        <button class="shelf-remove" onclick="removeFromShelf(${b.id})" title="Remove">&times;</button>
+        <div onclick="openBookDetail(${b.id})" style="cursor:pointer;">
+          <div class="shelf-cover">
+            ${b.coverId
+              ? `<img src="${coverUrl(b.coverId, 'M')}" alt="">`
+              : `<span class="fallback">${escapeHtml(b.title)}</span>`}
+          </div>
+          <div class="shelf-title">${escapeHtml(b.title)}</div>
+          <div class="shelf-author">${escapeHtml(b.author)}${b.year ? ' · ' + b.year : ''}</div>
+        </div>
+        <div class="shelf-status-row">
+          ${STATUSES.map(s => `
+            <button class="status-toggle ${b.status === s.key ? 'active' : ''}" onclick="setStatus(${b.id}, '${s.key}')">${s.label}</button>
+          `).join('')}
+        </div>
+      </div>
+    `).join('') + `</div>`;
+  }
+
+  // ============ Book detail & notes ============
+  function firstLine(text) {
+    const line = (text || '').split('\n').map(l => l.trim()).find(l => l.length > 0);
+    return line ? (line.length > 60 ? line.slice(0, 60) + '…' : line) : '(untitled note)';
+  }
+
+  function prettyDateTime(iso) {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) +
+      ' at ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }
+
+  function openBookDetail(id) {
+    selectedBookId = id;
+    editingNoteId = null;
+    document.getElementById('shelfView').style.display = 'none';
+    document.getElementById('detailView').style.display = 'block';
+    renderBookDetail();
+  }
+
+  function closeBookDetail() {
+    selectedBookId = null;
+    editingNoteId = null;
+    document.getElementById('detailView').style.display = 'none';
+    document.getElementById('shelfView').style.display = 'block';
+    renderShelf();
+  }
+
+  function renderBookDetail() {
+    const book = data.books.find(b => b.id === selectedBookId);
+    if (!book) { closeBookDetail(); return; }
+    if (!book.notes) book.notes = [];
+
+    const editingNote = editingNoteId ? book.notes.find(n => n.id === editingNoteId) : null;
+    const notesSorted = [...book.notes].sort((a, b) => new Date(b.dateSaved) - new Date(a.dateSaved));
+
+    const detail = document.getElementById('detailView');
+    detail.innerHTML = `
+      <button class="back-link" onclick="closeBookDetail()">&larr; Back to Shelf</button>
+      <div class="book-detail-layout">
+        <div class="book-detail-left">
+          <div class="detail-cover">
+            ${book.coverId
+              ? `<img src="${coverUrl(book.coverId, 'L')}" alt="">`
+              : `<span class="fallback">${escapeHtml(book.title)}</span>`}
+          </div>
+          <div class="detail-title">${escapeHtml(book.title)}</div>
+          <div class="detail-author">${escapeHtml(book.author)}${book.year ? ' · ' + book.year : ''}</div>
+          <div class="shelf-status-row">
+            ${STATUSES.map(s => `
+              <button class="status-toggle ${book.status === s.key ? 'active' : ''}" onclick="setStatus(${book.id}, '${s.key}'); renderBookDetail();">${s.label}</button>
+            `).join('')}
+          </div>
+
+          <div class="note-preview-list">
+            <div class="note-preview-title">Notes</div>
+            ${notesSorted.length === 0
+              ? `<div class="empty-state" style="padding:10px 0;">No notes yet.</div>`
+              : notesSorted.map(n => `
+                  <div class="note-preview-item" onclick="editBookNote(${n.id})">
+                    <button class="npi-remove" onclick="event.stopPropagation(); deleteBookNote(${n.id})" title="Delete">&times;</button>
+                    <div class="npi-text">${escapeHtml(firstLine(n.text))}</div>
+                    <div class="npi-date">${prettyDateTime(n.dateSaved)}</div>
+                  </div>
+                `).join('')
+            }
+          </div>
+        </div>
+
+        <div class="book-detail-right">
+          <div class="note-box-card">
+            <textarea id="bookNoteInput" placeholder="Write your notes on this book...">${escapeHtml(editingNote ? editingNote.text : '')}</textarea>
+            <div class="note-box-footer">
+              <button class="btn" id="saveBookNoteBtn">Save</button>
+              ${editingNote ? '<span class="editing-hint">Editing a previous note</span>' : ''}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('saveBookNoteBtn').addEventListener('click', saveBookNote);
+  }
+
+  function editBookNote(noteId) {
+    editingNoteId = noteId;
+    renderBookDetail();
+  }
+
+  function saveBookNote() {
+    const book = data.books.find(b => b.id === selectedBookId);
+    if (!book) return;
+    if (!book.notes) book.notes = [];
+
+    const textarea = document.getElementById('bookNoteInput');
+    const text = textarea.value.trim();
+    if (!text) return;
+
+    if (editingNoteId) {
+      const note = book.notes.find(n => n.id === editingNoteId);
+      if (note) {
+        note.text = text;
+        note.dateSaved = new Date().toISOString();
+      }
+    } else {
+      book.notes.unshift({
+        id: Date.now(),
+        text,
+        dateSaved: new Date().toISOString(),
+      });
+    }
+
+    saveData();
+    editingNoteId = null;
+    renderBookDetail();
+  }
+
+  function deleteBookNote(noteId) {
+    const book = data.books.find(b => b.id === selectedBookId);
+    if (!book) return;
+    book.notes = (book.notes || []).filter(n => n.id !== noteId);
+    if (editingNoteId === noteId) editingNoteId = null;
+    saveData();
+    renderBookDetail();
+  }
+
+  document.getElementById('searchBtn').addEventListener('click', runSearch);
+  document.getElementById('searchInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
+
+  renderShelf();
+</script>
+
+</body>
+</html>
