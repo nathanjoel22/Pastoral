@@ -351,6 +351,17 @@
   }
   .btn:hover { background: var(--terracotta-soft); }
 
+  .logout-link {
+    all: unset;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--ink-soft);
+    display: block;
+    text-align: center;
+    margin-top: 6px;
+  }
+  .logout-link:hover { color: var(--terracotta); }
+
   @media (max-width: 700px) {
     .layout { flex-direction: column; }
     .subject-sidebar {
@@ -364,6 +375,7 @@
 </head>
 <body>
 
+<div id="appContent" style="display:none;">
 <div class="banner-wrap">
   <a class="home-link" href="index.html" title="Back to workspace">&#8962;</a>
   <img src="banner-spanish.jpg" alt="">
@@ -372,6 +384,7 @@
 <div class="page-title-bar">
   <h1>Spanish I &amp; II</h1>
   <div class="sub">Course Resources</div>
+  <button class="logout-link" id="logoutBtn">Log out</button>
 </div>
 
 <div class="layout">
@@ -390,10 +403,15 @@
     <div class="content-card" id="contentCard"></div>
   </div>
 </div>
+</div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
+  const SUPABASE_URL = 'https://nkfflkrlpulujmgdxxcg.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_8YxOZr6EHXyHzdtbs68PTg_0B5g1tXz';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
   const SUBJECT_KEY = 'spanish_course_selected_subject';
-  const LESSONS_KEY = 'spanish_lessons_v1';
 
   function getSelectedSubject() {
     try { return localStorage.getItem(SUBJECT_KEY) || 'spanish1'; }
@@ -404,19 +422,68 @@
     catch (e) { console.error(e); }
   }
 
-  function loadLessons() {
-    try {
-      const raw = localStorage.getItem(LESSONS_KEY);
-      if (raw) return JSON.parse(raw);
-    } catch (e) { console.error(e); }
-    return { spanish1: [], spanish2: [] };
-  }
-  function saveLessons() {
-    try { localStorage.setItem(LESSONS_KEY, JSON.stringify(lessonData)); }
-    catch (e) { console.error(e); }
+  function rowToLesson(r) {
+    return {
+      id: r.id,
+      title: r.title,
+      content: r.content,
+      createdDate: r.created_at,
+      updatedDate: r.updated_at,
+    };
   }
 
-  let lessonData = loadLessons();
+  async function fetchLessons() {
+    const { data: rows, error } = await sb
+      .from('spanish_lessons')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error(error);
+      alert('Could not load your lessons: ' + error.message);
+      return { spanish1: [], spanish2: [] };
+    }
+    const result = { spanish1: [], spanish2: [] };
+    (rows || []).forEach(r => {
+      if (!result[r.subject]) result[r.subject] = [];
+      result[r.subject].push(rowToLesson(r));
+    });
+    return result;
+  }
+
+  async function insertLessonRemote(subject, title) {
+    const { data: inserted, error } = await sb
+      .from('spanish_lessons')
+      .insert({ subject, title, content: '' })
+      .select()
+      .single();
+    if (error) {
+      console.error(error);
+      alert('Could not add that lesson: ' + error.message);
+      return null;
+    }
+    return rowToLesson(inserted);
+  }
+
+  async function updateLessonRemote(id, content) {
+    const { error } = await sb
+      .from('spanish_lessons')
+      .update({ content, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) {
+      console.error(error);
+      alert('Could not save that lesson: ' + error.message);
+    }
+  }
+
+  async function deleteLessonRemote(id) {
+    const { error } = await sb.from('spanish_lessons').delete().eq('id', id);
+    if (error) {
+      console.error(error);
+      alert('Could not delete that lesson: ' + error.message);
+    }
+  }
+
+  let lessonData = { spanish1: [], spanish2: [] };
   let editingLessonId = null;
 
   function escapeHtml(str) {
@@ -488,25 +555,19 @@
     input.focus();
   }
 
-  function addLesson(subject, title) {
+  async function addLesson(subject, title) {
     if (!lessonData[subject]) lessonData[subject] = [];
-    const lesson = {
-      id: 'l' + Date.now(),
-      title,
-      content: '',
-      createdDate: new Date().toISOString(),
-      updatedDate: new Date().toISOString(),
-    };
+    const lesson = await insertLessonRemote(subject, title);
+    if (!lesson) return;
     lessonData[subject].unshift(lesson);
-    saveLessons();
     renderLessonList(subject);
   }
 
-  function deleteLesson(lessonId) {
+  async function deleteLesson(lessonId) {
     const subject = getSelectedSubject();
+    await deleteLessonRemote(lessonId);
     lessonData[subject] = (lessonData[subject] || []).filter(l => l.id !== lessonId);
     if (editingLessonId === lessonId) editingLessonId = null;
-    saveLessons();
     renderContent(subject);
   }
 
@@ -567,15 +628,15 @@
     document.getElementById('saveLessonBtn').addEventListener('click', () => saveLesson(subject, lesson.id));
   }
 
-  function saveLesson(subject, lessonId) {
+  async function saveLesson(subject, lessonId) {
     const lessonEditor = document.getElementById('lessonEditor');
     const html = lessonEditor.innerHTML;
+    await updateLessonRemote(lessonId, html);
     const lesson = (lessonData[subject] || []).find(l => l.id === lessonId);
     if (lesson) {
       lesson.content = html;
       lesson.updatedDate = new Date().toISOString();
     }
-    saveLessons();
     editingLessonId = null;
     renderContent(subject);
   }
@@ -596,7 +657,21 @@
   document.getElementById('btnSpanish1').addEventListener('click', () => selectSubject('spanish1'));
   document.getElementById('btnSpanish2').addEventListener('click', () => selectSubject('spanish2'));
 
-  selectSubject(getSelectedSubject());
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await sb.auth.signOut();
+    window.location.href = 'index.html';
+  });
+
+  (async function start() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) {
+      window.location.href = 'index.html';
+      return;
+    }
+    document.getElementById('appContent').style.display = 'block';
+    lessonData = await fetchLessons();
+    selectSubject(getSelectedSubject());
+  })();
 </script>
 
 </body>
