@@ -91,6 +91,15 @@
     background: var(--paper-line);
   }
 
+  .logout-link {
+    all: unset;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--ink-soft);
+    align-self: center;
+  }
+  .logout-link:hover { color: var(--maroon); }
+
   nav {
     display: flex;
     align-items: center;
@@ -581,6 +590,7 @@
 </head>
 <body>
 
+<div id="appContent" style="display:none;">
 <div class="margin-line"></div>
 
 <header>
@@ -595,6 +605,7 @@
     <button data-view="search">Search Notes</button>
     <button data-view="memorize">Memorize</button>
   </nav>
+  <button class="logout-link" id="logoutBtn">Log out</button>
 </header>
 
 <main id="main"></main>
@@ -605,7 +616,13 @@
   &nbsp;&middot;&nbsp; <a href="https://www.esv.org" target="_blank" rel="noopener">www.esv.org</a>
 </footer>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
+  const SUPABASE_URL = 'https://nkfflkrlpulujmgdxxcg.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_8YxOZr6EHXyHzdtbs68PTg_0B5g1tXz';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  let currentUserId = null;
+
   // ============ Bible structure: canonical order, chapter counts ============
   const BOOKS = [
     ["Genesis",50],["Exodus",40],["Leviticus",27],["Numbers",36],["Deuteronomy",34],
@@ -717,27 +734,77 @@
   }
 
   // ============ Storage ============
-  const STORAGE_KEY = 'esv_reading_plan_v1';
-
-  function loadData() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (!parsed.memorization) parsed.memorization = [];
-        return parsed;
-      }
-    } catch (e) { console.error('Load failed', e); }
-    return { currentDayIndex: 0, notes: {}, passageCache: {}, memorization: [] };
+  function rowToNote(r) {
+    return { text: r.text || '', date: r.note_date, images: r.images || [] };
   }
 
-  function saveData() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (e) { console.error('Save failed', e); }
+  async function fetchAllData() {
+    const { data: noteRows, error: noteErr } = await sb.from('reading_plan_notes').select('*');
+    if (noteErr) { console.error(noteErr); alert('Could not load your notes: ' + noteErr.message); }
+
+    const { data: memoRows, error: memoErr } = await sb
+      .from('reading_plan_memorization')
+      .select('*')
+      .order('id', { ascending: false });
+    if (memoErr) console.error(memoErr);
+
+    const { data: progressRow } = await sb.from('reading_plan_progress').select('*').maybeSingle();
+
+    const notes = {};
+    (noteRows || []).forEach(r => { notes[r.day_index] = rowToNote(r); });
+
+    const memorization = (memoRows || []).map(r => ({
+      id: r.id, reference: r.reference, text: r.text, dateAdded: r.date_added,
+    }));
+
+    return {
+      currentDayIndex: progressRow ? progressRow.current_day_index : 0,
+      notes,
+      passageCache: {},
+      memorization,
+    };
   }
 
-  let data = loadData();
+  async function saveNoteRemote(dayIndex, text, date, images) {
+    const { error } = await sb.from('reading_plan_notes').upsert({
+      user_id: currentUserId,
+      day_index: dayIndex,
+      text: text || '',
+      note_date: date || todayStr(),
+      images: images || [],
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,day_index' });
+    if (error) { console.error(error); alert('Could not save that: ' + error.message); }
+  }
+
+  async function deleteNoteRemote(dayIndex) {
+    const { error } = await sb.from('reading_plan_notes').delete().eq('day_index', dayIndex);
+    if (error) { console.error(error); alert('Could not delete that: ' + error.message); }
+  }
+
+  async function insertMemoRemote(reference, text) {
+    const { data: inserted, error } = await sb
+      .from('reading_plan_memorization')
+      .insert({ user_id: currentUserId, reference, text, date_added: todayStr() })
+      .select()
+      .single();
+    if (error) { console.error(error); alert('Could not save that verse: ' + error.message); return null; }
+    return { id: inserted.id, reference: inserted.reference, text: inserted.text, dateAdded: inserted.date_added };
+  }
+
+  async function deleteMemoRemote(id) {
+    const { error } = await sb.from('reading_plan_memorization').delete().eq('id', id);
+    if (error) { console.error(error); alert('Could not delete that: ' + error.message); }
+  }
+
+  async function updateProgressRemote(currentDayIndex) {
+    const { error } = await sb
+      .from('reading_plan_progress')
+      .upsert({ user_id: currentUserId, current_day_index: currentDayIndex }, { onConflict: 'user_id' });
+    if (error) console.error(error);
+  }
+
+  let data = { currentDayIndex: 0, notes: {}, passageCache: {}, memorization: [] };
 
   // ============ Helpers ============
   function todayStr() {
@@ -848,9 +915,11 @@
     const textarea = document.getElementById('notesArea');
     textarea.addEventListener('input', () => {
       clearTimeout(saveNoteTimer);
-      saveNoteTimer = setTimeout(() => {
-        data.notes[dayIndex] = { text: textarea.value, date: data.notes[dayIndex]?.date || todayStr(), images: data.notes[dayIndex]?.images || [] };
-        saveData();
+      saveNoteTimer = setTimeout(async () => {
+        const images = data.notes[dayIndex]?.images || [];
+        const date = data.notes[dayIndex]?.date || todayStr();
+        data.notes[dayIndex] = { text: textarea.value, date, images };
+        await saveNoteRemote(dayIndex, textarea.value, date, images);
         const ind = document.getElementById('saveIndicator');
         if (ind) {
           ind.textContent = 'Saved';
@@ -884,7 +953,6 @@
     try {
       const passages = await fetchDayPassage(dayIndex);
       data.passageCache[dayIndex] = passages;
-      saveData();
       if (document.getElementById(bodyId)) {
         body.innerHTML = formatPassageHtml(passages);
       }
@@ -907,15 +975,19 @@
     loadPassageInto(dayIndex, bodyId);
   }
 
-  function markDayComplete(dayIndex) {
+  async function markDayComplete(dayIndex) {
     const textarea = document.getElementById('notesArea');
+    const images = data.notes[dayIndex]?.images || [];
     if (textarea) {
-      data.notes[dayIndex] = { text: textarea.value, date: todayStr(), images: data.notes[dayIndex]?.images || [] };
+      const date = todayStr();
+      data.notes[dayIndex] = { text: textarea.value, date, images };
+      await saveNoteRemote(dayIndex, textarea.value, date, images);
     } else if (data.notes[dayIndex]) {
       data.notes[dayIndex].date = todayStr();
+      await saveNoteRemote(dayIndex, data.notes[dayIndex].text, data.notes[dayIndex].date, images);
     }
     data.currentDayIndex = dayIndex + 1;
-    saveData();
+    await updateProgressRemote(data.currentDayIndex);
     renderCurrentView();
   }
 
@@ -932,8 +1004,9 @@
         statusEl.textContent = "Couldn't find that reference — check the format (e.g. John 3:16).";
         return;
       }
-      data.memorization.push({ id: Date.now(), reference: ref, text, dateAdded: todayStr() });
-      saveData();
+      const memo = await insertMemoRemote(ref, text);
+      if (!memo) return;
+      data.memorization.push(memo);
       input.value = '';
       statusEl.textContent = 'Added to Memorize.';
       setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 1800);
@@ -972,9 +1045,9 @@
     if (card) card.classList.toggle('flipped');
   }
 
-  function deleteMemoCard(id) {
+  async function deleteMemoCard(id) {
+    await deleteMemoRemote(id);
     data.memorization = data.memorization.filter(m => m.id !== id);
-    saveData();
     viewMemorize();
   }
 
@@ -1032,7 +1105,7 @@
       const dataUrl = await resizeImageFile(file);
       const images = ensureNoteImagesArray(dayIndex);
       images.push({ id: 'img' + Date.now(), dataUrl, dateAdded: new Date().toISOString() });
-      saveData();
+      await saveNoteRemote(dayIndex, data.notes[dayIndex].text, data.notes[dayIndex].date, images);
       rerender();
     } catch (err) {
       console.error(err);
@@ -1042,10 +1115,10 @@
     }
   }
 
-  function deleteNoteImage(dayIndex, imageId) {
+  async function deleteNoteImage(dayIndex, imageId) {
     if (!data.notes[dayIndex] || !data.notes[dayIndex].images) return;
     data.notes[dayIndex].images = data.notes[dayIndex].images.filter(i => i.id !== imageId);
-    saveData();
+    await saveNoteRemote(dayIndex, data.notes[dayIndex].text, data.notes[dayIndex].date, data.notes[dayIndex].images);
     if (selectedPreviousDay === dayIndex) {
       renderPreviousDayDetail(dayIndex);
     } else {
@@ -1068,14 +1141,14 @@
     document.getElementById('imageLightbox').style.display = 'none';
   }
 
-  function deleteNote(dayIndex, onDone) {
+  async function deleteNote(dayIndex, onDone) {
     const note = data.notes[dayIndex];
     const hasContent = note && (note.text || (note.images && note.images.length > 0));
     if (!hasContent) return;
     const ok = confirm('Delete your notes for this day? This can\'t be undone.');
     if (!ok) return;
+    await deleteNoteRemote(dayIndex);
     delete data.notes[dayIndex];
-    saveData();
     if (onDone) onDone();
   }
 
@@ -1215,9 +1288,11 @@
     const textarea = document.getElementById('prevNotesArea');
     textarea.addEventListener('input', () => {
       clearTimeout(saveNoteTimer);
-      saveNoteTimer = setTimeout(() => {
-        data.notes[dayIndex] = { text: textarea.value, date: data.notes[dayIndex]?.date || todayStr(), images: data.notes[dayIndex]?.images || [] };
-        saveData();
+      saveNoteTimer = setTimeout(async () => {
+        const images = data.notes[dayIndex]?.images || [];
+        const date = data.notes[dayIndex]?.date || todayStr();
+        data.notes[dayIndex] = { text: textarea.value, date, images };
+        await saveNoteRemote(dayIndex, textarea.value, date, images);
         const ind = document.getElementById('prevSaveIndicator');
         if (ind) {
           ind.textContent = 'Saved';
@@ -1258,7 +1333,22 @@
 
   navButtons.forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
 
-  renderCurrentView();
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await sb.auth.signOut();
+    window.location.href = 'index.html';
+  });
+
+  (async function start() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) {
+      window.location.href = 'index.html';
+      return;
+    }
+    currentUserId = session.user.id;
+    document.getElementById('appContent').style.display = 'block';
+    data = await fetchAllData();
+    renderCurrentView();
+  })();
 </script>
   <div class="image-lightbox" id="imageLightbox" style="display:none;">
     <div class="lightbox-backdrop" onclick="closeLightbox()"></div>
@@ -1270,6 +1360,8 @@
       </div>
     </div>
   </div>
+</div>
+
 
 </body>
 </html>
