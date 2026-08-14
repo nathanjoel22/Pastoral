@@ -85,6 +85,66 @@
     background: var(--paper-line);
   }
 
+  .logout-link {
+    all: unset;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-left: auto;
+    align-self: center;
+  }
+  .logout-link:hover { color: var(--margin-red); }
+
+  .login-screen {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--paper);
+    z-index: 10;
+  }
+
+  .login-card {
+    background: var(--card);
+    border-radius: 6px;
+    box-shadow: 0 4px 20px var(--shadow);
+    padding: 32px 30px;
+    width: 320px;
+    text-align: center;
+  }
+
+  .login-card h1 {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 18px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin: 0 0 6px 0;
+  }
+
+  .login-card p {
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin: 0 0 20px 0;
+  }
+
+  .login-card input {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+
+  .login-card .btn {
+    width: 100%;
+    margin-top: 6px;
+  }
+
+  .login-error {
+    font-size: 12px;
+    color: var(--margin-red);
+    margin-top: 12px;
+    min-height: 14px;
+  }
+
   .layout {
     position: relative;
     z-index: 1;
@@ -351,51 +411,145 @@
 
 <div class="margin-line"></div>
 
-<header>
-  <a class="home-link" href="index.html" title="Back to workspace">&#8962;</a>
-  <h1>Bullet Journal</h1>
-  <span class="date-today" id="headerDate"></span>
-</header>
-
-<div class="layout">
-  <nav id="nav">
-    <button data-view="today" class="active"><span class="sym">•</span> Today</button>
-    <button data-view="capture"><span class="sym">+</span> Quick Capture</button>
-    <button data-view="browse"><span class="sym">○</span> Browse Dates</button>
-    <button data-view="migrate"><span class="sym">></span> Migrate</button>
-    <button data-view="collections"><span class="sym">–</span> Collections</button>
-    <button data-view="index"><span class="sym">≡</span> Index</button>
-    <button data-view="search"><span class="sym">?</span> Search</button>
-  </nav>
-
-  <main id="main"></main>
+<div class="login-screen" id="loginScreen">
+  <div class="login-card">
+    <h1>Bullet Journal</h1>
+    <p>Sign in to access your journal</p>
+    <input type="email" id="loginEmail" placeholder="Email">
+    <input type="password" id="loginPassword" placeholder="Password">
+    <button class="btn" id="loginBtn">Log In</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
 </div>
 
+<div id="appContainer" style="display:none;">
+  <header>
+    <a class="home-link" href="index.html" title="Back to workspace">&#8962;</a>
+    <h1>Bullet Journal</h1>
+    <span class="date-today" id="headerDate"></span>
+    <button class="logout-link" id="logoutBtn">Log out</button>
+  </header>
+
+  <div class="layout">
+    <nav id="nav">
+      <button data-view="today" class="active"><span class="sym">•</span> Today</button>
+      <button data-view="capture"><span class="sym">+</span> Quick Capture</button>
+      <button data-view="browse"><span class="sym">○</span> Browse Dates</button>
+      <button data-view="migrate"><span class="sym">></span> Migrate</button>
+      <button data-view="collections"><span class="sym">–</span> Collections</button>
+      <button data-view="index"><span class="sym">≡</span> Index</button>
+      <button data-view="search"><span class="sym">?</span> Search</button>
+    </nav>
+
+    <main id="main"></main>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
-  // ---------- Storage ----------
-  const STORAGE_KEY = 'bujo_data_v1';
+  // ---------- Supabase ----------
+  const SUPABASE_URL = 'https://nkfflkrlpulujmgdxxcg.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_8YxOZr6EHXyHzdtbs68PTg_0B5g1tXz';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  function loadData() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed.lastProcessedMonth === undefined) parsed.lastProcessedMonth = null;
-        return parsed;
-      }
-    } catch (e) { console.error('Load failed', e); }
-    return { entries: [], collections: {}, nextId: 1, lastProcessedMonth: null };
+  function rowToEntry(r) {
+    return {
+      id: r.id,
+      type: r.type,
+      text: r.text,
+      scope: r.scope,
+      date: r.entry_date,
+      month: r.entry_month,
+      status: r.status,
+      collection: r.collection,
+    };
   }
 
-  function saveData() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (e) {
-      console.error('Save failed', e);
+  async function fetchAllData() {
+    const { data: entryRows, error: entryErr } = await sb
+      .from('bujo_entries')
+      .select('*')
+      .order('id', { ascending: true });
+
+    if (entryErr) {
+      console.error(entryErr);
+      alert('Could not load your journal: ' + entryErr.message);
+      return { entries: [], collections: {}, lastProcessedMonth: null };
     }
+
+    const { data: settingsRow } = await sb
+      .from('bujo_settings')
+      .select('*')
+      .maybeSingle();
+
+    const entries = (entryRows || []).map(rowToEntry);
+    const collections = {};
+    entries.forEach(e => { if (e.collection) collections[e.collection] = true; });
+
+    return {
+      entries,
+      collections,
+      lastProcessedMonth: settingsRow ? settingsRow.last_processed_month : null,
+    };
   }
 
-  let data = loadData();
+  async function insertEntry(type, text, opts = {}) {
+    const scope = opts.scope || 'day';
+    const row = {
+      type,
+      text,
+      scope,
+      entry_date: scope === 'month' ? null : (opts.date || todayStr()),
+      entry_month: scope === 'month' ? (opts.month || curMonthKey()) : null,
+      status: type === 'task' ? 'open' : null,
+      collection: opts.collection || null,
+    };
+    const { data: inserted, error } = await sb.from('bujo_entries').insert(row).select().single();
+    if (error) {
+      console.error(error);
+      alert('Could not save that: ' + error.message);
+      return null;
+    }
+    const entry = rowToEntry(inserted);
+    data.entries.push(entry);
+    if (entry.collection) data.collections[entry.collection] = true;
+    return entry;
+  }
+
+  async function updateEntryRemote(id, fields) {
+    const dbFields = {};
+    if ('status' in fields) dbFields.status = fields.status;
+    if ('collection' in fields) dbFields.collection = fields.collection;
+    if ('text' in fields) dbFields.text = fields.text;
+    const { error } = await sb.from('bujo_entries').update(dbFields).eq('id', id);
+    if (error) {
+      console.error(error);
+      alert('Could not update that: ' + error.message);
+      return;
+    }
+    const entry = data.entries.find(e => e.id === id);
+    if (entry) Object.assign(entry, fields);
+  }
+
+  async function deleteEntryRemote(id) {
+    const { error } = await sb.from('bujo_entries').delete().eq('id', id);
+    if (error) {
+      console.error(error);
+      alert('Could not delete that: ' + error.message);
+      return;
+    }
+    data.entries = data.entries.filter(e => e.id !== id);
+  }
+
+  async function saveLastProcessedMonth(month) {
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return;
+    const { error } = await sb.from('bujo_settings').upsert({ user_id: user.id, last_processed_month: month });
+    if (error) console.error(error);
+    data.lastProcessedMonth = month;
+  }
+
+  let data = { entries: [], collections: {}, lastProcessedMonth: null };
   let currentCaptureType = 'task';
   let activeCollection = null;
 
@@ -430,14 +584,12 @@
 
   // Carries open tasks forward into the new month, then archives the
   // finished month's entries into a Collection named after that month.
-  function processMonthRollover() {
+  async function processMonthRollover() {
     const nowMonth = curMonthKey();
     if (!data.lastProcessedMonth) {
-      data.lastProcessedMonth = nowMonth;
-      saveData();
+      await saveLastProcessedMonth(nowMonth);
       return;
     }
-    let changed = false;
     while (data.lastProcessedMonth < nowMonth) {
       const oldMonth = data.lastProcessedMonth;
       const newMonth = nextMonthKey(oldMonth);
@@ -447,21 +599,21 @@
           (e.scope !== 'month' && e.date && e.date.slice(0, 7) === oldMonth)
         )
       );
-      monthsEntries.forEach(e => {
+      for (const e of monthsEntries) {
         if (e.type === 'task' && e.status === 'open') {
-          e.status = 'migrated';
-          addEntry('task', e.text, { scope: 'month', month: newMonth });
+          await updateEntryRemote(e.id, { status: 'migrated' });
+          await insertEntry('task', e.text, { scope: 'month', month: newMonth });
         }
-      });
+      }
       if (monthsEntries.length > 0) {
         const archiveName = monthLabel(oldMonth);
         data.collections[archiveName] = true;
-        monthsEntries.forEach(e => { e.collection = archiveName; });
+        for (const e of monthsEntries) {
+          await updateEntryRemote(e.id, { collection: archiveName });
+        }
       }
-      data.lastProcessedMonth = newMonth;
-      changed = true;
+      await saveLastProcessedMonth(newMonth);
     }
-    if (changed) saveData();
   }
 
   function symbolFor(entry) {
@@ -480,21 +632,8 @@
     return '';
   }
 
-  function addEntry(type, text, opts = {}) {
-    const scope = opts.scope || 'day';
-    const entry = {
-      id: data.nextId++,
-      type,
-      text,
-      scope,
-      date: scope === 'month' ? null : (opts.date || todayStr()),
-      month: scope === 'month' ? (opts.month || curMonthKey()) : null,
-      status: type === 'task' ? 'open' : null,
-      collection: opts.collection || null,
-    };
-    data.entries.push(entry);
-    saveData();
-    return entry;
+  async function addEntry(type, text, opts = {}) {
+    return await insertEntry(type, text, opts);
   }
 
   function entriesForDate(dateStr) {
@@ -731,17 +870,16 @@
   }
 
   // ---------- Actions ----------
-  function toggleDone(id) {
+  async function toggleDone(id) {
     const e = data.entries.find(x => x.id === id);
     if (!e) return;
-    e.status = e.status === 'done' ? 'open' : 'done';
-    saveData();
+    const newStatus = e.status === 'done' ? 'open' : 'done';
+    await updateEntryRemote(id, { status: newStatus });
     renderCurrentView();
   }
 
-  function deleteEntry(id) {
-    data.entries = data.entries.filter(x => x.id !== id);
-    saveData();
+  async function deleteEntry(id) {
+    await deleteEntryRemote(id);
     renderCurrentView();
   }
 
@@ -750,29 +888,29 @@
     renderCurrentView();
   }
 
-  function submitCapture() {
+  async function submitCapture() {
     const input = document.getElementById('captureText');
     const text = input.value.trim();
     if (!text) return;
-    addEntry(currentCaptureType, text);
+    await addEntry(currentCaptureType, text);
     input.value = '';
     renderCurrentView();
   }
 
-  function submitCollectionItem() {
+  async function submitCollectionItem() {
     const input = document.getElementById('collectionItemText');
     const text = input.value.trim();
     if (!text || !activeCollection) return;
-    addEntry(currentCaptureType, text, { collection: activeCollection, date: todayStr() });
+    await addEntry(currentCaptureType, text, { collection: activeCollection, date: todayStr() });
     input.value = '';
     renderCurrentView();
   }
 
-  function submitMonthlyItem() {
+  async function submitMonthlyItem() {
     const input = document.getElementById('monthlyLogText');
     const text = input.value.trim();
     if (!text) return;
-    addEntry(currentCaptureType, text, { scope: 'month', month: curMonthKey() });
+    await addEntry(currentCaptureType, text, { scope: 'month', month: curMonthKey() });
     input.value = '';
     renderCurrentView();
   }
@@ -783,7 +921,6 @@
     if (!name) return;
     data.collections[name] = true;
     activeCollection = name;
-    saveData();
     renderCurrentView();
   }
 
@@ -792,14 +929,13 @@
     renderCurrentView();
   }
 
-  function migrateAll() {
+  async function migrateAll() {
     const dateStr = todayStr();
     const stale = openTasksBefore(dateStr);
-    stale.forEach(e => {
-      e.status = 'migrated';
-      addEntry('task', e.text, { date: dateStr });
-    });
-    saveData();
+    for (const e of stale) {
+      await updateEntryRemote(e.id, { status: 'migrated' });
+      await addEntry('task', e.text, { date: dateStr });
+    }
     renderCurrentView();
   }
 
@@ -840,9 +976,54 @@
 
   navButtons.forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
 
-  processMonthRollover();
-  document.getElementById('headerDate').textContent = prettyDate(todayStr());
-  renderCurrentView();
+  // ---------- Auth gate ----------
+  async function initApp() {
+    data = await fetchAllData();
+    await processMonthRollover();
+    document.getElementById('headerDate').textContent = prettyDate(todayStr());
+    renderCurrentView();
+  }
+
+  function showApp() {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('appContainer').style.display = 'block';
+  }
+
+  function showLogin() {
+    document.getElementById('appContainer').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+  }
+
+  document.getElementById('loginBtn').addEventListener('click', async () => {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const errorEl = document.getElementById('loginError');
+    errorEl.textContent = '';
+    if (!email || !password) { errorEl.textContent = 'Enter your email and password.'; return; }
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) { errorEl.textContent = error.message; return; }
+    showApp();
+    await initApp();
+  });
+
+  document.getElementById('loginPassword').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('loginBtn').click();
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await sb.auth.signOut();
+    showLogin();
+  });
+
+  (async function start() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+      showApp();
+      await initApp();
+    } else {
+      showLogin();
+    }
+  })();
 </script>
 
 </body>
