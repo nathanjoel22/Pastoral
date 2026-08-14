@@ -72,6 +72,17 @@
     background: rgba(244,234,210,0.15);
   }
 
+  .logout-link {
+    all: unset;
+    cursor: pointer;
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: 11px;
+    color: rgba(244,234,210,0.7);
+  }
+  .logout-link:hover { color: var(--brass-bright); }
+
   header h1 {
     margin: 0;
     font-size: 30px;
@@ -509,9 +520,11 @@
 </head>
 <body>
 
+<div id="appContent" style="display:none;">
 <div class="wrap">
   <header>
     <a class="home-link" href="index.html" title="Back to workspace">&#8962;</a>
+    <button class="logout-link" id="logoutBtn">Log out</button>
     <h1>Sermon Preparation</h1>
     <div class="sub">A quiet place to study</div>
   </header>
@@ -581,8 +594,15 @@
 </div>
 
 <div id="printableOutline" class="print-only"></div>
+</div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
+  const SUPABASE_URL = 'https://nkfflkrlpulujmgdxxcg.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_8YxOZr6EHXyHzdtbs68PTg_0B5g1tXz';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  let currentUserId = null;
+
   // ============ ESV API ============
   const ESV_API_KEY = '46eb88fdca716c9ea434ff3d72f1e5198681154d';
   const ESV_API_URL = 'https://api.esv.org/v3/passage/text/';
@@ -635,9 +655,6 @@
   }
 
   // ============ Storage ============
-  const ARCHIVE_KEY = 'sermon_prep_archive_v1';
-  const DRAFT_KEY = 'sermon_prep_draft_v1';
-  const OUTLINE_DRAFT_KEY = 'sermon_prep_outline_draft_v1';
   const CLAUDE_KEY_STORAGE = 'sermon_prep_claude_api_key_v1';
 
   function getStoredClaudeKey() {
@@ -647,49 +664,95 @@
     try { localStorage.setItem(CLAUDE_KEY_STORAGE, key); } catch (e) {}
   }
 
-  function loadArchive() {
-    try {
-      const raw = localStorage.getItem(ARCHIVE_KEY);
-      if (raw) return JSON.parse(raw);
-    } catch (e) { console.error(e); }
-    return { notes: [] };
-  }
-  function saveArchive() {
-    try { localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archiveData)); }
-    catch (e) { console.error(e); }
+  function rowToSermonNote(r) {
+    return { id: r.id, reference: r.reference, contentHtml: r.content_html, dateSaved: r.date_saved };
   }
 
-  function loadDraft() {
-    try {
-      const raw = localStorage.getItem(DRAFT_KEY);
-      if (raw) return JSON.parse(raw);
-    } catch (e) { console.error(e); }
-    return null;
-  }
-  function saveDraft() {
-    try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({
-        reference: state.reference,
-        passageHtml: state.passageHtml,
-        headings: state.headings,
-        editorHtml: document.getElementById('notesEditor').innerHTML,
-        currentNoteId: state.currentNoteId,
-      }));
-    } catch (e) { console.error(e); }
+  async function fetchArchive() {
+    const { data: rows, error } = await sb
+      .from('sermon_notes')
+      .select('*')
+      .order('date_saved', { ascending: false });
+    if (error) { console.error(error); alert('Could not load your archive: ' + error.message); return []; }
+    return (rows || []).map(rowToSermonNote);
   }
 
-  let archiveData = loadArchive();
+  async function insertSermonNoteRemote(reference, contentHtml) {
+    const { data: inserted, error } = await sb
+      .from('sermon_notes')
+      .insert({ reference, content_html: contentHtml })
+      .select()
+      .single();
+    if (error) { console.error(error); alert('Could not save that: ' + error.message); return null; }
+    return rowToSermonNote(inserted);
+  }
+
+  async function updateSermonNoteRemote(id, contentHtml) {
+    const { error } = await sb
+      .from('sermon_notes')
+      .update({ content_html: contentHtml, date_saved: new Date().toISOString() })
+      .eq('id', id);
+    if (error) { console.error(error); alert('Could not save that: ' + error.message); }
+  }
+
+  async function deleteSermonNoteRemote(id) {
+    const { error } = await sb.from('sermon_notes').delete().eq('id', id);
+    if (error) { console.error(error); alert('Could not delete that: ' + error.message); }
+  }
+
+  async function deleteSermonNotesRemote(ids) {
+    const { error } = await sb.from('sermon_notes').delete().in('id', ids);
+    if (error) { console.error(error); alert('Could not delete those: ' + error.message); }
+  }
+
+  async function fetchWorkspace() {
+    const { data: row, error } = await sb.from('sermon_workspace').select('*').maybeSingle();
+    if (error) console.error(error);
+    return row;
+  }
+
+  async function saveWorkspaceRemote(fields) {
+    const { error } = await sb
+      .from('sermon_workspace')
+      .upsert({ user_id: currentUserId, ...fields }, { onConflict: 'user_id' });
+    if (error) console.error(error);
+  }
+
+  let archiveData = { notes: [] };
   let state = { reference: null, passageHtml: null, headings: [], currentNoteId: null };
   let selectedArchiveIds = new Set();
+  let outlineSourceState = null;
+  let currentOutlineText = '';
 
-  function loadOutlineDraft() {
-    try {
-      const raw = localStorage.getItem(OUTLINE_DRAFT_KEY);
-      if (raw) return JSON.parse(raw);
-    } catch (e) { console.error(e); }
-    return null;
+  let draftSaveTimer = null;
+  function saveDraft() {
+    clearTimeout(draftSaveTimer);
+    draftSaveTimer = setTimeout(() => {
+      const editorEl = document.getElementById('notesEditor');
+      saveWorkspaceRemote({
+        draft_reference: state.reference,
+        draft_passage_html: state.passageHtml,
+        draft_headings: state.headings || [],
+        draft_editor_html: editorEl ? editorEl.innerHTML : '',
+        draft_current_note_id: state.currentNoteId,
+      });
+    }, 600);
   }
-  let outlineSourceState = loadOutlineDraft();
+
+  let outlineSaveTimer = null;
+  function saveOutlineText(html) {
+    currentOutlineText = html;
+    clearTimeout(outlineSaveTimer);
+    outlineSaveTimer = setTimeout(() => {
+      saveWorkspaceRemote({ outline_text: html });
+    }, 600);
+  }
+
+  async function saveOutlineTextImmediate(html) {
+    currentOutlineText = html;
+    clearTimeout(outlineSaveTimer);
+    await saveWorkspaceRemote({ outline_text: html });
+  }
 
   function htmlToPlainText(html) {
     const div = document.createElement('div');
@@ -814,7 +877,7 @@
   });
 
   // ============ Save to Archive ============
-  document.getElementById('saveBtn').addEventListener('click', () => {
+  document.getElementById('saveBtn').addEventListener('click', async () => {
     const statusEl = document.getElementById('saveStatus');
     if (!state.reference) {
       statusEl.textContent = 'Search a passage before saving.';
@@ -822,25 +885,17 @@
       return;
     }
     const contentHtml = editor.innerHTML;
-    const now = new Date().toISOString();
 
     if (state.currentNoteId) {
+      await updateSermonNoteRemote(state.currentNoteId, contentHtml);
       const note = archiveData.notes.find(n => n.id === state.currentNoteId);
-      if (note) {
-        note.contentHtml = contentHtml;
-        note.dateSaved = now;
-      }
+      if (note) { note.contentHtml = contentHtml; note.dateSaved = new Date().toISOString(); }
     } else {
-      const note = {
-        id: Date.now(),
-        reference: state.reference,
-        contentHtml,
-        dateSaved: now,
-      };
+      const note = await insertSermonNoteRemote(state.reference, contentHtml);
+      if (!note) return;
       archiveData.notes.unshift(note);
       state.currentNoteId = note.id;
     }
-    saveArchive();
     saveDraft();
     statusEl.textContent = 'Saved to archive.';
     statusEl.className = 'save-status ok';
@@ -890,14 +945,14 @@
     document.getElementById('createOutlineBtn').disabled = selectedArchiveIds.size < 1;
   }
 
-  function deleteArchiveNote(id) {
+  async function deleteArchiveNote(id) {
+    await deleteSermonNoteRemote(id);
     archiveData.notes = archiveData.notes.filter(n => n.id !== id);
     selectedArchiveIds.delete(id);
-    saveArchive();
     renderArchive();
   }
 
-  document.getElementById('mergeBtn').addEventListener('click', () => {
+  document.getElementById('mergeBtn').addEventListener('click', async () => {
     const selected = archiveData.notes.filter(n => selectedArchiveIds.has(n.id));
     if (selected.length < 2) return;
     selected.sort((a, b) => new Date(a.dateSaved) - new Date(b.dateSaved)); // oldest first
@@ -907,17 +962,16 @@
       <div style="margin-top:6px;">${n.contentHtml || ''}</div>
     `).join('<hr style="margin:16px 0; border:none; border-top:1px dashed rgba(169,120,47,0.35);">');
 
-    const mergedNote = {
-      id: Date.now(),
-      reference: selected.map(n => n.reference).join(' + '),
-      contentHtml: mergedHtml,
-      dateSaved: new Date().toISOString(),
-    };
+    const mergedReference = selected.map(n => n.reference).join(' + ');
+    const mergedNote = await insertSermonNoteRemote(mergedReference, mergedHtml);
+    if (!mergedNote) return;
+
+    const idsToRemove = selected.map(n => n.id);
+    await deleteSermonNotesRemote(idsToRemove);
 
     archiveData.notes = archiveData.notes.filter(n => !selectedArchiveIds.has(n.id));
     archiveData.notes.unshift(mergedNote);
     selectedArchiveIds.clear();
-    saveArchive();
     renderArchive();
   });
 
@@ -934,7 +988,7 @@
     const combinedRefs = [...new Set(selected.map(n => n.reference))].join('; ');
 
     outlineSourceState = { sourceNotes, combinedRefs, generatedAt: new Date().toISOString() };
-    try { localStorage.setItem(OUTLINE_DRAFT_KEY, JSON.stringify(outlineSourceState)); } catch (e) { console.error(e); }
+    saveWorkspaceRemote({ outline_source: outlineSourceState });
 
     document.querySelector('.tab-btn[data-tab="outline"]').click();
   });
@@ -958,20 +1012,12 @@
   });
 
   // ============ Outline tab (freeform) ============
-  const OUTLINE_TEXT_KEY = 'sermon_prep_outline_text_v1';
   const ROMAN_HEADING_RE = /^(X{0,3})(IX|IV|V?I{0,3})\.(\s|$)/i;
-
-  function loadOutlineText() {
-    try { return localStorage.getItem(OUTLINE_TEXT_KEY) || ''; } catch (e) { return ''; }
-  }
-  function saveOutlineText(html) {
-    try { localStorage.setItem(OUTLINE_TEXT_KEY, html); } catch (e) { console.error(e); }
-  }
 
   function renderOutline() {
     const card = document.getElementById('outlineCard');
     const hasSourceNotes = !!(outlineSourceState && outlineSourceState.sourceNotes && outlineSourceState.sourceNotes.length > 0);
-    const savedHtml = loadOutlineText();
+    const savedHtml = currentOutlineText;
     const hasKey = !!getStoredClaudeKey();
 
     const sourceHtml = hasSourceNotes ? outlineSourceState.sourceNotes.map(n => `
@@ -1033,8 +1079,8 @@
       }
     });
 
-    document.getElementById('saveOutlineBtn').addEventListener('click', () => {
-      saveOutlineText(outlineEditor.innerHTML);
+    document.getElementById('saveOutlineBtn').addEventListener('click', async () => {
+      await saveOutlineTextImmediate(outlineEditor.innerHTML);
       const statusEl = document.getElementById('outlineSaveStatus');
       statusEl.textContent = 'Saved — you can come back to this anytime.';
       statusEl.className = 'save-status ok';
@@ -1062,12 +1108,12 @@
     if (copyPromptBtn) copyPromptBtn.addEventListener('click', () => copyOutlinePrompt(outlineSourceState));
     document.getElementById('insertSynthBtn').addEventListener('click', insertOutlineIntoNotes);
     document.getElementById('exportPdfBtn').addEventListener('click', exportOutlinePdf);
-    document.getElementById('clearOutlineBtn').addEventListener('click', () => {
+    document.getElementById('clearOutlineBtn').addEventListener('click', async () => {
       const ok = confirm('Clear this outline? This can\'t be undone.');
       if (!ok) return;
       outlineSourceState = null;
-      try { localStorage.removeItem(OUTLINE_DRAFT_KEY); } catch (e) {}
-      saveOutlineText('');
+      currentOutlineText = '';
+      await saveWorkspaceRemote({ outline_source: null, outline_text: '' });
       renderOutline();
     });
   }
@@ -1214,18 +1260,37 @@ Here are my notes to synthesize:
     window.print();
   }
 
-  // ============ Restore draft on load ============
-  (function restoreDraft() {
-    const draft = loadDraft();
-    if (draft && draft.reference) {
-      state.reference = draft.reference;
-      state.passageHtml = draft.passageHtml;
-      state.headings = draft.headings || [];
-      state.currentNoteId = draft.currentNoteId || null;
-      document.getElementById('passageRef').textContent = draft.reference;
-      document.getElementById('passageText').innerHTML = draft.passageHtml || '';
-      document.getElementById('notesEditor').innerHTML = draft.editorHtml || '';
-      document.getElementById('searchInput').value = draft.reference;
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await sb.auth.signOut();
+    window.location.href = 'index.html';
+  });
+
+  (async function start() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) {
+      window.location.href = 'index.html';
+      return;
+    }
+    currentUserId = session.user.id;
+    document.getElementById('appContent').style.display = 'block';
+
+    archiveData.notes = await fetchArchive();
+
+    const workspace = await fetchWorkspace();
+    if (workspace) {
+      state.reference = workspace.draft_reference;
+      state.passageHtml = workspace.draft_passage_html;
+      state.headings = workspace.draft_headings || [];
+      state.currentNoteId = workspace.draft_current_note_id;
+      currentOutlineText = workspace.outline_text || '';
+      outlineSourceState = workspace.outline_source || null;
+
+      if (state.reference) {
+        document.getElementById('passageRef').textContent = state.reference;
+        document.getElementById('passageText').innerHTML = state.passageHtml || '';
+        document.getElementById('notesEditor').innerHTML = workspace.draft_editor_html || '';
+        document.getElementById('searchInput').value = state.reference;
+      }
     }
   })();
 </script>
