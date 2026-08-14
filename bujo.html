@@ -95,56 +95,6 @@
   }
   .logout-link:hover { color: var(--margin-red); }
 
-  .login-screen {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--paper);
-    z-index: 10;
-  }
-
-  .login-card {
-    background: var(--card);
-    border-radius: 6px;
-    box-shadow: 0 4px 20px var(--shadow);
-    padding: 32px 30px;
-    width: 320px;
-    text-align: center;
-  }
-
-  .login-card h1 {
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 18px;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    margin: 0 0 6px 0;
-  }
-
-  .login-card p {
-    font-size: 13px;
-    color: var(--ink-soft);
-    margin: 0 0 20px 0;
-  }
-
-  .login-card input {
-    width: 100%;
-    margin-bottom: 10px;
-  }
-
-  .login-card .btn {
-    width: 100%;
-    margin-top: 6px;
-  }
-
-  .login-error {
-    font-size: 12px;
-    color: var(--margin-red);
-    margin-top: 12px;
-    min-height: 14px;
-  }
-
   .layout {
     position: relative;
     z-index: 1;
@@ -410,17 +360,6 @@
 <body>
 
 <div class="margin-line"></div>
-
-<div class="login-screen" id="loginScreen">
-  <div class="login-card">
-    <h1>Bullet Journal</h1>
-    <p>Sign in to access your journal</p>
-    <input type="email" id="loginEmail" placeholder="Email">
-    <input type="password" id="loginPassword" placeholder="Password">
-    <button class="btn" id="loginBtn">Log In</button>
-    <div class="login-error" id="loginError"></div>
-  </div>
-</div>
 
 <div id="appContainer" style="display:none;">
   <header>
@@ -985,34 +924,12 @@
   }
 
   function showApp() {
-    document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('appContainer').style.display = 'block';
   }
 
-  function showLogin() {
-    document.getElementById('appContainer').style.display = 'none';
-    document.getElementById('loginScreen').style.display = 'flex';
-  }
-
-  document.getElementById('loginBtn').addEventListener('click', async () => {
-    const email = document.getElementById('loginEmail').value.trim();
-    const password = document.getElementById('loginPassword').value;
-    const errorEl = document.getElementById('loginError');
-    errorEl.textContent = '';
-    if (!email || !password) { errorEl.textContent = 'Enter your email and password.'; return; }
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) { errorEl.textContent = error.message; return; }
-    showApp();
-    await initApp();
-  });
-
-  document.getElementById('loginPassword').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') document.getElementById('loginBtn').click();
-  });
-
   document.getElementById('logoutBtn').addEventListener('click', async () => {
     await sb.auth.signOut();
-    showLogin();
+    window.location.href = 'index.html';
   });
 
   (async function start() {
@@ -1021,7 +938,7 @@
       showApp();
       await initApp();
     } else {
-      showLogin();
+      window.location.href = 'index.html';
     }
   })();
 </script>

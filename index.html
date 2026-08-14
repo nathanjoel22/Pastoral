@@ -199,11 +199,117 @@
   @media (max-width: 480px) {
     .submenu { grid-template-columns: 1fr; }
   }
+
+  .login-screen {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    z-index: 10;
+  }
+
+  .login-card {
+    background: var(--card);
+    border: 1px solid var(--bg-line);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px var(--shadow);
+    padding: 34px 32px;
+    width: 320px;
+    text-align: center;
+  }
+
+  .login-card .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .login-card h1 {
+    margin: 0 0 6px 0;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--forest);
+  }
+
+  .login-card p {
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin: 0 0 20px 0;
+  }
+
+  .login-card input {
+    width: 100%;
+    font-family: Georgia, serif;
+    font-size: 14px;
+    padding: 10px 12px;
+    border: 1px solid var(--bg-line);
+    border-radius: 4px;
+    background: #fff;
+    color: var(--ink);
+    margin-bottom: 10px;
+  }
+  .login-card input:focus {
+    outline: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 2px rgba(176,141,62,0.15);
+  }
+
+  .login-card .btn {
+    all: unset;
+    cursor: pointer;
+    width: 100%;
+    box-sizing: border-box;
+    font-family: Georgia, serif;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 11px 20px;
+    border-radius: 4px;
+    background: var(--forest);
+    color: #fff;
+    text-align: center;
+    margin-top: 6px;
+  }
+  .login-card .btn:hover { background: var(--forest-soft); }
+
+  .login-error {
+    font-size: 12px;
+    color: #9c3b34;
+    margin-top: 12px;
+    min-height: 14px;
+  }
+
+  .logout-link {
+    all: unset;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--ink-soft);
+    display: block;
+    text-align: center;
+    margin-top: 24px;
+  }
+  .logout-link:hover { color: var(--forest); }
 </style>
 </head>
 <body>
 
-<div class="wrap">
+<div class="login-screen" id="loginScreen">
+  <div class="login-card">
+    <div class="eyebrow">Personal Tools</div>
+    <h1>Nathan Pugh's Workspace</h1>
+    <p>Sign in to access your workspace</p>
+    <input type="email" id="loginEmail" placeholder="Email">
+    <input type="password" id="loginPassword" placeholder="Password">
+    <button class="btn" id="loginBtn">Log In</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<div class="wrap" id="appWrap" style="display:none;">
   <header>
     <div class="eyebrow">Personal Tools</div>
     <h1>Nathan Pugh's Workspace</h1>
@@ -257,15 +363,59 @@
   </div>
 
   <footer>Private workspace &middot; built for personal use</footer>
+  <button class="logout-link" id="logoutBtn">Log out</button>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
+  const SUPABASE_URL = 'https://nkfflkrlpulujmgdxxcg.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_8YxOZr6EHXyHzdtbs68PTg_0B5g1tXz';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  function showApp() {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('appWrap').style.display = 'block';
+  }
+  function showLogin() {
+    document.getElementById('appWrap').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+  }
+
+  document.getElementById('loginBtn').addEventListener('click', async () => {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const errorEl = document.getElementById('loginError');
+    errorEl.textContent = '';
+    if (!email || !password) { errorEl.textContent = 'Enter your email and password.'; return; }
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) { errorEl.textContent = error.message; return; }
+    showApp();
+  });
+
+  document.getElementById('loginPassword').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('loginBtn').click();
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await sb.auth.signOut();
+    showLogin();
+  });
+
   const toggle = document.getElementById('trueVineToggle');
   const submenu = document.getElementById('trueVineSubmenu');
   toggle.addEventListener('click', () => {
     toggle.classList.toggle('expanded');
     submenu.classList.toggle('open');
   });
+
+  (async function start() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+      showApp();
+    } else {
+      showLogin();
+    }
+  })();
 </script>
 
 </body>
