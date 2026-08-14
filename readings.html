@@ -70,6 +70,17 @@
   }
   .home-link:hover { background: #fff; }
 
+  .logout-link {
+    all: unset;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--on-bg-soft);
+    text-shadow: var(--text-shadow);
+    display: block;
+    margin-top: 8px;
+  }
+  .logout-link:hover { color: var(--gold-bright); }
+
   header .eyebrow {
     font-size: 11px;
     letter-spacing: 0.28em;
@@ -552,11 +563,13 @@
 </head>
 <body>
 
+<div id="appContent" style="display:none;">
 <div class="wrap">
   <header>
     <a class="home-link" href="index.html" title="Back to workspace">&#8962;</a>
     <div class="eyebrow">Personal Tools</div>
     <h1>Nate's Library</h1>
+    <button class="logout-link" id="logoutBtn">Log out</button>
   </header>
 
   <div id="shelfView">
@@ -575,24 +588,116 @@
 
   <div id="detailView" style="display:none;"></div>
 </div>
+</div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
-  const STORAGE_KEY = 'nates_library_v1';
+  const SUPABASE_URL = 'https://nkfflkrlpulujmgdxxcg.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_8YxOZr6EHXyHzdtbs68PTg_0B5g1tXz';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  function loadData() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw);
-    } catch (e) { console.error(e); }
-    return { books: [] };
+  function rowToBook(r) {
+    return {
+      id: r.id,
+      workKey: r.work_key,
+      title: r.title,
+      author: r.author,
+      year: r.year,
+      coverId: r.cover_id,
+      status: r.status,
+      addedDate: r.added_date,
+      notes: [],
+    };
   }
 
-  function saveData() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
-    catch (e) { console.error(e); }
+  function rowToNote(r) {
+    return { id: r.id, text: r.text, dateSaved: r.date_saved };
   }
 
-  let data = loadData();
+  async function fetchLibrary() {
+    const { data: bookRows, error: bookErr } = await sb
+      .from('library_books')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (bookErr) {
+      console.error(bookErr);
+      alert('Could not load your library: ' + bookErr.message);
+      return { books: [] };
+    }
+    const { data: noteRows, error: noteErr } = await sb
+      .from('library_notes')
+      .select('*');
+    if (noteErr) console.error(noteErr);
+
+    const books = (bookRows || []).map(rowToBook);
+    (noteRows || []).forEach(nr => {
+      const book = books.find(b => b.id === nr.book_id);
+      if (book) book.notes.push(rowToNote(nr));
+    });
+
+    return { books };
+  }
+
+  async function insertBookRemote(book) {
+    const { data: inserted, error } = await sb
+      .from('library_books')
+      .insert({
+        work_key: book.workKey,
+        title: book.title,
+        author: book.author,
+        year: book.year,
+        cover_id: book.coverId,
+        status: 'want-to-read',
+        added_date: new Date().toISOString().slice(0, 10),
+      })
+      .select()
+      .single();
+    if (error) {
+      console.error(error);
+      alert('Could not add that book: ' + error.message);
+      return null;
+    }
+    return rowToBook(inserted);
+  }
+
+  async function deleteBookRemote(id) {
+    const { error } = await sb.from('library_books').delete().eq('id', id);
+    if (error) { console.error(error); alert('Could not remove that book: ' + error.message); }
+  }
+
+  async function updateBookStatusRemote(id, status) {
+    const { error } = await sb.from('library_books').update({ status }).eq('id', id);
+    if (error) { console.error(error); alert('Could not update that: ' + error.message); }
+  }
+
+  async function insertNoteRemote(bookId, text) {
+    const { data: inserted, error } = await sb
+      .from('library_notes')
+      .insert({ book_id: bookId, text })
+      .select()
+      .single();
+    if (error) {
+      console.error(error);
+      alert('Could not save that note: ' + error.message);
+      return null;
+    }
+    return rowToNote(inserted);
+  }
+
+  async function updateNoteRemote(noteId, text) {
+    const { error } = await sb
+      .from('library_notes')
+      .update({ text, date_saved: new Date().toISOString() })
+      .eq('id', noteId);
+    if (error) { console.error(error); alert('Could not save that note: ' + error.message); }
+  }
+
+  async function deleteNoteRemote(noteId) {
+    const { error } = await sb.from('library_notes').delete().eq('id', noteId);
+    if (error) { console.error(error); alert('Could not delete that note: ' + error.message); }
+  }
+
+  let data = { books: [] };
   let selectedBookId = null;
   let editingNoteId = null;
 
@@ -661,40 +766,32 @@
     }
   }
 
-  function addToShelf(index) {
+  async function addToShelf(index) {
     const book = lastResults[index];
     if (!book) return;
     if (data.books.some(b => b.workKey === book.workKey)) {
       document.getElementById('searchStatus').textContent = 'Already on your shelf.';
       return;
     }
-    data.books.unshift({
-      id: Date.now(),
-      workKey: book.workKey,
-      title: book.title,
-      author: book.author,
-      year: book.year,
-      coverId: book.coverId,
-      status: 'want-to-read',
-      addedDate: new Date().toISOString(),
-    });
-    saveData();
+    const newBook = await insertBookRemote(book);
+    if (!newBook) return;
+    data.books.unshift(newBook);
     document.getElementById('resultGrid').innerHTML = '';
     document.getElementById('searchInput').value = '';
     document.getElementById('searchStatus').textContent = `Added "${book.title}" to your shelf.`;
     renderShelf();
   }
 
-  function removeFromShelf(id) {
+  async function removeFromShelf(id) {
+    await deleteBookRemote(id);
     data.books = data.books.filter(b => b.id !== id);
-    saveData();
     renderShelf();
   }
 
-  function setStatus(id, status) {
+  async function setStatus(id, status) {
     const book = data.books.find(b => b.id === id);
     if (book) book.status = status;
-    saveData();
+    await updateBookStatusRemote(id, status);
     renderShelf();
   }
 
@@ -870,7 +967,7 @@
     return (div.textContent || div.innerText || '').trim();
   }
 
-  function saveBookNote() {
+  async function saveBookNote() {
     const book = data.books.find(b => b.id === selectedBookId);
     if (!book) return;
     if (!book.notes) book.notes = [];
@@ -880,37 +977,48 @@
     if (!htmlToPlainText(html)) return;
 
     if (editingNoteId) {
+      await updateNoteRemote(editingNoteId, html);
       const note = book.notes.find(n => n.id === editingNoteId);
       if (note) {
         note.text = html;
         note.dateSaved = new Date().toISOString();
       }
     } else {
-      book.notes.unshift({
-        id: Date.now(),
-        text: html,
-        dateSaved: new Date().toISOString(),
-      });
+      const newNote = await insertNoteRemote(book.id, html);
+      if (newNote) book.notes.unshift(newNote);
     }
 
-    saveData();
     editingNoteId = null;
     renderBookDetail();
   }
 
-  function deleteBookNote(noteId) {
+  async function deleteBookNote(noteId) {
     const book = data.books.find(b => b.id === selectedBookId);
     if (!book) return;
+    await deleteNoteRemote(noteId);
     book.notes = (book.notes || []).filter(n => n.id !== noteId);
     if (editingNoteId === noteId) editingNoteId = null;
-    saveData();
     renderBookDetail();
   }
 
   document.getElementById('searchBtn').addEventListener('click', runSearch);
   document.getElementById('searchInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
 
-  renderShelf();
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await sb.auth.signOut();
+    window.location.href = 'index.html';
+  });
+
+  (async function start() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) {
+      window.location.href = 'index.html';
+      return;
+    }
+    document.getElementById('appContent').style.display = 'block';
+    data = await fetchLibrary();
+    renderShelf();
+  })();
 </script>
 
 </body>
