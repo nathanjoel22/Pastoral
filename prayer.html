@@ -74,6 +74,16 @@
     color: var(--forest);
   }
 
+  .logout-link {
+    all: unset;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--ink-soft);
+    display: block;
+    margin-top: 10px;
+  }
+  .logout-link:hover { color: var(--forest); }
+
   .lords-prayer-card {
     background: var(--card);
     border: 1px solid var(--bg-line);
@@ -246,11 +256,13 @@
 </head>
 <body>
 
+<div id="appContent" style="display:none;">
 <div class="wrap">
   <header>
     <a class="home-link" href="index.html" title="Back to workspace">&#8962;</a>
     <div class="eyebrow">True Vine Community Church</div>
     <h1>Prayer</h1>
+    <button class="logout-link" id="logoutBtn">Log out</button>
   </header>
 
   <div class="lords-prayer-card">
@@ -279,8 +291,14 @@
     </div>
   </div>
 </div>
+</div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
+  const SUPABASE_URL = 'https://nkfflkrlpulujmgdxxcg.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_8YxOZr6EHXyHzdtbs68PTg_0B5g1tXz';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
   // ============ ESV API ============
   const ESV_API_KEY = '46eb88fdca716c9ea434ff3d72f1e5198681154d';
   const ESV_API_URL = 'https://api.esv.org/v3/passage/text/';
@@ -317,21 +335,60 @@
   }
 
   // ============ Storage ============
-  const STORAGE_KEY = 'prayer_page_data_v1';
-
-  function loadData() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw);
-    } catch (e) { console.error(e); }
-    return { prayers: [] };
-  }
-  function saveData() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
-    catch (e) { console.error(e); }
+  function rowToPrayer(r) {
+    return {
+      id: r.id,
+      text: r.text,
+      status: r.status,
+      dateAdded: r.date_added,
+      dateAnswered: r.date_answered,
+      answerText: r.answer_text,
+    };
   }
 
-  let data = loadData();
+  async function fetchPrayers() {
+    const { data: rows, error } = await sb
+      .from('prayers')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error(error);
+      alert('Could not load your prayers: ' + error.message);
+      return [];
+    }
+    return (rows || []).map(rowToPrayer);
+  }
+
+  async function insertPrayerRemote(text) {
+    const { data: inserted, error } = await sb
+      .from('prayers')
+      .insert({ text, status: 'new', date_added: todayStr() })
+      .select()
+      .single();
+    if (error) {
+      console.error(error);
+      alert('Could not save that prayer: ' + error.message);
+      return null;
+    }
+    return rowToPrayer(inserted);
+  }
+
+  async function updatePrayerStatusRemote(id, status) {
+    const { error } = await sb.from('prayers').update({ status }).eq('id', id);
+    if (error) { console.error(error); alert('Could not update that: ' + error.message); }
+  }
+
+  async function updatePrayerAnswerRemote(id, answerText, dateAnswered) {
+    const { error } = await sb.from('prayers').update({ answer_text: answerText, date_answered: dateAnswered }).eq('id', id);
+    if (error) { console.error(error); alert('Could not save that: ' + error.message); }
+  }
+
+  async function deletePrayerRemote(id) {
+    const { error } = await sb.from('prayers').delete().eq('id', id);
+    if (error) { console.error(error); alert('Could not delete that: ' + error.message); }
+  }
+
+  let data = { prayers: [] };
   let editingAnswerId = null;
 
   function escapeHtml(str) {
@@ -352,31 +409,25 @@
   }
 
   // ============ Prayer actions ============
-  function addPrayer(text) {
-    data.prayers.unshift({
-      id: 'p' + Date.now(),
-      text,
-      status: 'new',
-      dateAdded: todayStr(),
-      dateAnswered: null,
-      answerText: null,
-    });
-    saveData();
+  async function addPrayer(text) {
+    const prayer = await insertPrayerRemote(text);
+    if (!prayer) return;
+    data.prayers.unshift(prayer);
     renderAll();
   }
 
-  function movePrayer(id, newStatus) {
+  async function movePrayer(id, newStatus) {
     const prayer = data.prayers.find(p => p.id === id);
     if (!prayer) return;
+    await updatePrayerStatusRemote(id, newStatus);
     prayer.status = newStatus;
-    saveData();
     renderAll();
   }
 
-  function removePrayer(id) {
+  async function removePrayer(id) {
+    await deletePrayerRemote(id);
     data.prayers = data.prayers.filter(p => p.id !== id);
     if (editingAnswerId === id) editingAnswerId = null;
-    saveData();
     renderAll();
   }
 
@@ -385,13 +436,14 @@
     renderAll();
   }
 
-  function saveAnswer(id, text) {
+  async function saveAnswer(id, text) {
     const prayer = data.prayers.find(p => p.id === id);
     if (!prayer) return;
+    const dateAnswered = todayStr();
+    await updatePrayerAnswerRemote(id, text, dateAnswered);
     prayer.answerText = text;
-    prayer.dateAnswered = todayStr();
+    prayer.dateAnswered = dateAnswered;
     editingAnswerId = null;
-    saveData();
     renderAll();
   }
 
@@ -408,10 +460,10 @@
     container.innerHTML = items.map(p => {
       const isAnswered = status === 'answered';
       const clickHandler = status === 'new'
-        ? `movePrayer('${p.id}', 'ongoing')`
+        ? `movePrayer(${p.id}, 'ongoing')`
         : status === 'ongoing'
-          ? `movePrayer('${p.id}', 'answered')`
-          : `openAnswerEditor('${p.id}')`;
+          ? `movePrayer(${p.id}, 'answered')`
+          : `openAnswerEditor(${p.id})`;
 
       let extraHtml = '';
       if (isAnswered) {
@@ -428,7 +480,7 @@
 
       return `
         <div class="prayer-item ${isAnswered ? 'answered' : ''}" onclick="${clickHandler}">
-          <button class="prayer-remove" onclick="event.stopPropagation(); removePrayer('${p.id}')" title="Delete">&times;</button>
+          <button class="prayer-remove" onclick="event.stopPropagation(); removePrayer(${p.id})" title="Delete">&times;</button>
           <div class="prayer-line">${escapeHtml(p.text)}</div>
           <div class="prayer-date">${prettyDate(p.dateAdded)}</div>
           ${extraHtml}
@@ -467,8 +519,22 @@
     }
   });
 
-  loadLordsPrayer();
-  renderAll();
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await sb.auth.signOut();
+    window.location.href = 'index.html';
+  });
+
+  (async function start() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) {
+      window.location.href = 'index.html';
+      return;
+    }
+    document.getElementById('appContent').style.display = 'block';
+    data.prayers = await fetchPrayers();
+    renderAll();
+    loadLordsPrayer();
+  })();
 </script>
 
 </body>
