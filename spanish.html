@@ -532,12 +532,12 @@
         ${lessons.length === 0
           ? `<div class="content-placeholder">No lesson plans yet. Type a name above and hit Enter to add one.</div>`
           : lessons.map(l => `
-              <div class="lesson-item" onclick="openLesson('${l.id}')">
+              <div class="lesson-item" onclick="openLesson(${l.id})">
                 <div>
                   <div class="lesson-item-title">${escapeHtml(l.title)}</div>
                   <div class="lesson-item-date">${prettyDateTime(l.createdDate)}</div>
                 </div>
-                <button class="lesson-item-remove" onclick="event.stopPropagation(); deleteLesson('${l.id}')" title="Delete">&times;</button>
+                <button class="lesson-item-remove" onclick="event.stopPropagation(); deleteLesson(${l.id})" title="Delete">&times;</button>
               </div>
             `).join('')
         }
